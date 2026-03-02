@@ -31,21 +31,27 @@ TEST_LDFLAGS	= $(LDFLAGS) -lgtest -lgtest_main -lpthread
 TEST_STR_OBJ_FILES	= $(TESTOBJ_DIR)/StringUtilsTest.o $(TESTOBJ_DIR)/StringUtils.o
 TEST_STRSRC_OBJ_FILES = $(TESTOBJ_DIR)/StringDataSource.o $(TESTOBJ_DIR)/StringDataSourceTest.o
 TEST_STRSINK_OBJ_FILES = $(TESTOBJ_DIR)/StringDataSink.o $(TESTOBJ_DIR)/StringDataSinkTest.o
+TEST_FILESS_OBJ_FILES = $(TESTOBJ_DIR)/FileDataFactory.o $(TESTOBJ_DIR)/FileDataSource.o $(TESTOBJ_DIR)/FileDataSink.o $(TESTOBJ_DIR)/FileDataSSTest.o
+TEST_GEOUTILS_OBJ_FILES = $(TESTOBJ_DIR)/GeographicUtils.o $(TESTOBJ_DIR)/GeographicUtilsTest.o
 TEST_DSV_OBJ_FILES = $(TESTOBJ_DIR)/StringDataSink.o $(TESTOBJ_DIR)/DSVWriter.o $(TESTOBJ_DIR)/DSVTest.o $(TESTOBJ_DIR)/StringUtils.o ${TESTOBJ_DIR}/StringDataSource.o $(TESTOBJ_DIR)/DSVReader.o
 TEST_XML_OBJ_FILES = $(TESTOBJ_DIR)/StringDataSource.o $(TESTOBJ_DIR)/XMLReader.o $(TESTOBJ_DIR)/XMLWriter.o $(TESTOBJ_DIR)/StringDataSink.o $(TESTOBJ_DIR)/XMLTest.o 
 TEST_CSVBS_OBJ_FILES = $(TESTOBJ_DIR)/StringDataSource.o $(TESTOBJ_DIR)/DSVReader.o $(TESTOBJ_DIR)/CSVBusSystem.o $(TESTOBJ_DIR)/CSVBusSystemTest.o
+TEST_CSVBSINDEX_OBJ_FILES = $(TESTOBJ_DIR)/StringDataSource.o $(TESTOBJ_DIR)/DSVReader.o $(TESTOBJ_DIR)/CSVBusSystem.o $(TESTOBJ_DIR)/BusSystemIndexer.o  $(TESTOBJ_DIR)/CSVBusSystemIndexerTest.o
 TEST_OSM_OBJ_FILES = $(TESTOBJ_DIR)/StringDataSource.o $(TESTOBJ_DIR)/XMLReader.o $(TESTOBJ_DIR)/OpenStreetMap.o $(TESTOBJ_DIR)/OpenStreetMapTest.o
 # Define the test target
 TEST_STR_TARGET	= $(TESTBIN_DIR)/teststrutils
 TEST_STRSRC_TARGET	= $(TESTBIN_DIR)/teststrdatasource 
 TEST_STRSINK_TARGET	= $(TESTBIN_DIR)/teststrdatasink
+TEST_FILESS_TARGET	= $(TESTBIN_DIR)/testfiledatass
+TEST_GEOUTILS_TARGET = $(TESTBIN_DIR)/testgeoutils
 TEST_DSV_TARGET = $(TESTBIN_DIR)/testdsv
 TEST_XML_TARGET = $(TESTBIN_DIR)/testxml
 TEST_CSVBS_TARGET = $(TESTBIN_DIR)/testcsvbs
+TEST_CSVBSINDEX_TARGET = $(TESTBIN_DIR)/testcsvbsindexer
 TEST_OSM_TARGET	= $(TESTBIN_DIR)/testosm
 
 
-all: directories run_strtest run_strsrctest run_strsinktest run_dsvtest run_xmltest run_osmtest run_csvbstest  gencoverage
+all: directories run_strtest run_strsrctest run_strsinktest run_filesstest run_geoutilstest run_dsvtest run_xmltest run_csvbsindextest run_osmtest run_csvbstest  gencoverage
 
 run_strtest: $(TEST_STR_TARGET)
 	$(TEST_STR_TARGET) --gtest_output=xml:$(TESTTMP_DIR)/$@
@@ -59,6 +65,14 @@ run_strsinktest: $(TEST_STRSINK_TARGET)
 	$(TEST_STRSINK_TARGET) --gtest_output=xml:$(TESTTMP_DIR)/$@
 	mv $(TESTTMP_DIR)/$@ $@
 
+run_filesstest: $(TEST_FILESS_TARGET)
+	$(TEST_FILESS_TARGET) --gtest_output=xml:$(TESTTMP_DIR)/$@
+	mv $(TESTTMP_DIR)/$@ $@
+
+run_geoutilstest: $(TEST_GEOUTILS_TARGET)
+	$(TEST_GEOUTILS_TARGET) --gtest_output=xml:$(TESTTMP_DIR)/$@
+	mv $(TESTTMP_DIR)/$@ $@
+
 run_dsvtest: $(TEST_DSV_TARGET)
 	$(TEST_DSV_TARGET) --gtest_output=xml:$(TESTTMP_DIR)/$@
 	mv $(TESTTMP_DIR)/$@ $@
@@ -69,6 +83,10 @@ run_xmltest: $(TEST_XML_TARGET)
 
 run_csvbstest: $(TEST_CSVBS_TARGET)
 	$(TEST_CSVBS_TARGET) --gtest_output=xml:$(TESTTMP_DIR)/$@
+	mv $(TESTTMP_DIR)/$@ $@
+
+run_csvbsindextest: $(TEST_CSVBSINDEX_TARGET)
+	$(TEST_CSVBSINDEX_TARGET) --gtest_output=xml:$(TESTTMP_DIR)/$@
 	mv $(TESTTMP_DIR)/$@ $@
 
 run_osmtest: $(TEST_OSM_TARGET)
@@ -89,6 +107,12 @@ $(TEST_STRSRC_TARGET): $(TEST_STRSRC_OBJ_FILES)
 $(TEST_STRSINK_TARGET): $(TEST_STRSINK_OBJ_FILES)
 	$(CXX) $(TEST_CFLAGS) $(TEST_CPPFLAGS) $(TEST_STRSINK_OBJ_FILES) $(TEST_LDFLAGS) -o $(TEST_STRSINK_TARGET)
 
+$(TEST_FILESS_TARGET): $(TEST_FILESS_OBJ_FILES)
+	$(CXX) $(TEST_CFLAGS) $(TEST_CPPFLAGS) $(TEST_FILESS_OBJ_FILES) $(TEST_LDFLAGS) -o $(TEST_FILESS_TARGET)
+
+$(TEST_GEOUTILS_TARGET): $(TEST_GEOUTILS_OBJ_FILES)
+	$(CXX) $(TEST_CFLAGS) $(TEST_CPPFLAGS) $(TEST_GEOUTILS_OBJ_FILES) $(TEST_LDFLAGS) -o $(TEST_GEOUTILS_TARGET)
+
 $(TEST_DSV_TARGET): $(TEST_DSV_OBJ_FILES)
 	$(CXX) $(TEST_CFLAGS) $(TEST_CPPFLAGS) $(TEST_DSV_OBJ_FILES) $(TEST_LDFLAGS) -o $(TEST_DSV_TARGET)
 
@@ -97,6 +121,9 @@ $(TEST_XML_TARGET): $(TEST_XML_OBJ_FILES)
 
 $(TEST_CSVBS_TARGET): $(TEST_CSVBS_OBJ_FILES)
 	$(CXX) $(TEST_CFLAGS) $(TEST_CPPFLAGS) $(TEST_CSVBS_OBJ_FILES) $(TEST_LDFLAGS) -o $(TEST_CSVBS_TARGET)
+
+$(TEST_CSVBSINDEX_TARGET): $(TEST_CSVBSINDEX_OBJ_FILES)
+	$(CXX) $(TEST_CFLAGS) $(TEST_CPPFLAGS) $(TEST_CSVBSINDEX_OBJ_FILES) $(TEST_LDFLAGS) -o $(TEST_CSVBSINDEX_TARGET)
 
 $(TEST_OSM_TARGET): $(TEST_OSM_OBJ_FILES)
 	$(CXX) $(TEST_CFLAGS) $(TEST_CPPFLAGS) $(TEST_OSM_OBJ_FILES) $(TEST_LDFLAGS) -o $(TEST_OSM_TARGET)
@@ -125,6 +152,6 @@ clean::
 	rm -rf $(TESTOBJ_DIR)
 	rm -rf $(TESTCOVER_DIR)
 	rm -rf $(TESTTMP_DIR)
-	rm -f run_strtest run_strsrctest run_strsinktest run_dsvtest run_xmltest run_csvbstest run_osmtest
+	rm -f run_strtest run_strsrctest run_strsinktest run_dsvtest run_xmltest run_csvbstest run_osmtest run_filesstest run_geoutilstest run_csvbsindextest
 
 .PHONY: clean

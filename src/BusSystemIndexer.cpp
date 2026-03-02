@@ -1,4 +1,5 @@
 #include "BusSystemIndexer.h"
+#include "BusSystem.h"
 #include <vector> 
 #include <unordered_map>
 #include <algorithm>
@@ -9,7 +10,8 @@ struct CBusSystemIndexer::SImplementation{
     std::vector<std::shared_ptr<SStop>> DSortedStopsByIndex;// vector, store the sorted stops objptrs, enable to access by index
     std::unordered_map<TNodeID,std::shared_ptr<SStop>> DStopByNodeID;// unorderedmap, from nodeid to stop objptr, enable to access by nodeid
     std::vector<std::shared_ptr<SRoute>> DSortedRoutesByIndex;// vector, store the sorted routes objptrs, enable to access by index
-    
+    //std::unordered_map<CBusSystem::TStopID,TNodeID> DNodeIDbyStopID;// unorderedmap, from stopid to nodeid, enable O(1) access from stopid to nodeid
+
     // std::unordered_map does not provide a default hash implementation for std::pair, so we need to create our own.
     struct pairhash{
         std::size_t operator()(const std::pair<TNodeID,TNodeID> &x) const {
@@ -34,6 +36,7 @@ struct CBusSystemIndexer::SImplementation{
             auto Stop = DBussystem->StopByIndex(Index);
             DSortedStopsByIndex.push_back(Stop);
             DStopByNodeID[Stop->NodeID()] = Stop;
+            //DNodeIDbyStopID[Stop->ID()] = Stop->NodeID();
         }
         // prototype std::sort(begin_iterator, end_iterator, comparison_function);
         //[](std::shared_ptr<SStop> l,std::shared_ptr<SStop> r){ return l->ID() < r->ID(); } is a lambda expression
@@ -53,8 +56,14 @@ struct CBusSystemIndexer::SImplementation{
             // These 2 inner nested for loop are used to find all possible {src, dest} pairs and initialize DRoutesBetweenStops
             for(size_t SrcIndex = 0; SrcIndex < Route->StopCount(); SrcIndex++){
                 for(size_t DestIndex = SrcIndex + 1; DestIndex < Route->StopCount(); DestIndex++){
-                    TNodeID SrcID = Route->GetStopID(SrcIndex);
-                    TNodeID DestID = Route->GetStopID(DestIndex);
+                    // Since there's no direct mapping from stop id to node id, we need to get the stop object ptr and then access it id
+                    // Both GetStopID and StopByID takes constant time.
+                    auto SrcStopID = Route->GetStopID(SrcIndex);// O(1)
+                    auto DestStopID = Route->GetStopID(DestIndex);
+                    auto SrcStop = DBussystem->StopByID(SrcStopID);// O(1)
+                    auto DestStop = DBussystem->StopByID(DestStopID);
+                    TNodeID SrcID = SrcStop->NodeID();
+                    TNodeID DestID = DestStop->NodeID();
                     std::pair<TNodeID, TNodeID> Key = {SrcID, DestID};
                     DRoutesBetweenStops[Key].insert(Route);
                 }
