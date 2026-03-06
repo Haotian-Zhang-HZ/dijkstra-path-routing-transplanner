@@ -41,6 +41,10 @@ TEST(CSVBusSystemIndexer, StopTest){
     ASSERT_TRUE(bool(Stop2Index));
     EXPECT_EQ(Stop2Index->ID(),2);
     EXPECT_EQ(Stop2Index->NodeID(),102);
+    auto Stop3Index = BusSystemIndexer.SortedStopByIndex(2);
+    auto Stop3Node = BusSystemIndexer.StopByNodeID(103);
+    EXPECT_EQ(Stop3Index,nullptr);
+    EXPECT_EQ(Stop3Node,nullptr);
 }
 
 TEST(CSVBusSystemIndexer, RouteTest){
@@ -75,10 +79,16 @@ TEST(CSVBusSystemIndexer, RouteTest){
     EXPECT_EQ(Route2Index->GetStopID(0),1);
     EXPECT_EQ(Route2Index->GetStopID(1),2);
     EXPECT_EQ(Route2Index->GetStopID(2),1);
+    auto Route3Index = BusSystemIndexer.SortedRouteByIndex(2);
+    EXPECT_FALSE(bool(Route3Index));
+
     std::unordered_set< std::shared_ptr<CBusSystem::SRoute> > Routes;
     EXPECT_TRUE(BusSystemIndexer.RoutesByNodeIDs(101,102,Routes));
+    EXPECT_FALSE(BusSystemIndexer.RoutesByNodeIDs(101,103,Routes));
+    EXPECT_TRUE(BusSystemIndexer.RouteBetweenNodeIDs(101,102));
     EXPECT_EQ(Routes.size(),2);
     EXPECT_TRUE(Routes.find(Route1Index) != Routes.end());
     EXPECT_TRUE(Routes.find(Route2Index) != Routes.end());
-
+    
+    
 }

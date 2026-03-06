@@ -128,22 +128,16 @@ struct CBusSystemIndexer::SImplementation{
     // the src and dest nodes will be placed in routes unordered set.
     bool RoutesByNodeIDs(TNodeID src, TNodeID dest, 
     std::unordered_set<std::shared_ptr<SRoute> > &routes) const noexcept{
-        routes.clear();// we might use the same contianer multiple times and we don't want the elements in it to accumulate
-        if(src == dest){
-            return false;
+        std::pair<TNodeID,TNodeID> Key = std::make_pair(src,dest);
+        auto it = DRoutesBetweenStops.find(Key);
+        if(it != DRoutesBetweenStops.end()){
+            routes.clear();// we might use the same contianer multiple times and we don't want the elements in it to accumulate and we should only clear the container when success
+            routes.insert(it->second.begin(),it->second.end());//it->second is a unordered set.
+            return true;
         }
         else{
-            std::pair<TNodeID,TNodeID> Key = std::make_pair(src,dest);
-            auto it = DRoutesBetweenStops.find(Key);
-            if(it != DRoutesBetweenStops.end()){
-                routes.insert(it->second.begin(),it->second.end());
-                return true;
-            }
-            else{
-                return false;
-            }
+            return false;
         }
-        
     }
 
     // Returns true if at least one route exists between the stops at the src and 
@@ -152,13 +146,8 @@ struct CBusSystemIndexer::SImplementation{
     // strictly before `dest`. The order of stops matters.
     // If `dest` appears before `src`, this function returns false.
     bool RouteBetweenNodeIDs(TNodeID src, TNodeID dest) const noexcept{
-        if(src == dest){
-            return false;
-        }
-        else{
-            std::pair<TNodeID,TNodeID> Key = std::make_pair(src,dest);
-            return DRoutesBetweenStops.find(Key) != DRoutesBetweenStops.end();
-        }
+        std::pair<TNodeID,TNodeID> Key = std::make_pair(src,dest);
+        return DRoutesBetweenStops.find(Key) != DRoutesBetweenStops.end();
     }
 };
 
