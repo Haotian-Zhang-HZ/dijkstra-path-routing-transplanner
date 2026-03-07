@@ -14,8 +14,10 @@ struct CBusSystemIndexer::SImplementation{
 
     // std::unordered_map does not provide a default hash implementation for std::pair, so we need to create our own.
     struct pairhash{
-        std::size_t operator()(const std::pair<TNodeID,TNodeID> &x) const {
-            return std::hash<TNodeID>()(x.first) ^ std::hash<TNodeID>()(x.second); // std::hash<TNodeID>()(x.first) will turn x.first into a hash value
+        std::size_t operator()(const std::pair<TNodeID,TNodeID> &pair) const {
+            std::size_t First = pair.first;
+            std::size_t Second = pair.second;
+            return First ^ (Second<<1); 
         }
     };
     std::unordered_map<std::pair<TNodeID,TNodeID>,std::unordered_set<std::shared_ptr<SRoute>>,pairhash> DRoutesBetweenStops;// unorderedmap, from {src, dest} pair to a unordered set of route ptrs 

@@ -1,9 +1,10 @@
 #include "DijkstraPathRouter.h"
 #include <limits>
 #include <queue>
+#include <stack>
 #include <utility>
 
-double Inf = std::numeric_limits<double>::infinity();
+double Inf = std::numeric_limits<double>::infinity();// or max() as prof implemented
 
 struct CDijkstraPathRouter::SImplementation{
 
@@ -48,8 +49,8 @@ struct CDijkstraPathRouter::SImplementation{
     
     std::vector<std::vector<double>> DDistanceBtwEveryPair; // create a dp table by using 2d array 
                                                             // DDistanceBtwEveryPair[src][dest] stores the shortest distance btw src and dest where both src and dest are TVertexID which are just the indexes of this 2d array                                          
-    std::vector<std::vector<std::vector<TVertexID>>> DPathBtwEveryPair; // DPathBtwEveryPair[src][dest] stores a vector of vertices, which include the path from src to dest
-    
+    //std::vector<std::vector<std::vector<TVertexID>>> DPathBtwEveryPair; // DPathBtwEveryPair[src][dest] stores a vector of vertices, which include the path from src to dest
+    std::vector<std::vector<TVertexID>> DParentBtwEveryPair;// DParentBtwEveryPair[src][dest] stores the previous node of dest in the shortest path from src to dest and we can create the path by going from the dest to src(push into a stack and pop will give the right order)
     
     SImplementation(){
             
@@ -108,10 +109,10 @@ struct CDijkstraPathRouter::SImplementation{
     //      2. safely skip outdated data by checking whether the distance in queue is larger than recorded distance stored in the global dp table. This saves time.
     //      3. delete the duplicated initialization for dp table. This save time.
     //      4. Avoid redundant 2D lookup by store it into a variable and call the variable multiple times
-    bool Dijkstra(const TVertexID src, std::vector<std::vector<double>> &Distance, std::vector<std::vector<std::vector<TVertexID>>> &Path){
+    bool Dijkstra(const TVertexID src, std::vector<std::vector<double>> &Distance, std::vector<std::vector<TVertexID>> &Parent){
         
         // Sanity check for inputs
-        if(src >= VertexCount() || Distance[src].size() != VertexCount() || Path[src].size() != VertexCount()){
+        if(src >= VertexCount() || Distance[src].size() != VertexCount() || Parent[src].size() != VertexCount()){
             return false;
         }
         // // Initialization for Dijkstra
@@ -122,7 +123,7 @@ struct CDijkstraPathRouter::SImplementation{
         //     Path[src][dest].clear();
         // } 
         Distance[src][src] = 0; // set the distance to src as 0
-        Path[src][src] = {src};
+        Parent[src][src] = src;
 
         // Initialize a priority queue
         std::priority_queue<std::pair<double, TVertexID>,std::vector<std::pair<double, TVertexID>>,std::greater<std::pair<double, TVertexID>>> PriorityQ; // priority_queue<Type, Container, Compare> default Compare is std::less<Type> thus creating a max-heap
@@ -158,11 +159,13 @@ struct CDijkstraPathRouter::SImplementation{
                 double& DistToCurr = Distance[src][CurrVertexID];
                 if (DistToAdj > DistToCurr + AdjEdge->GetWeight()){
                     DistToAdj = DistToCurr + AdjEdge->GetWeight(); // update the shortest distance to this vertex.
-                    Path[src][AdjVertexID] = Path[src][CurrVertexID];     // update shortest path to this adjacent vertex to "the path to the current vertex plus the edge between current edge and this adjacency. 
-                    Path[src][AdjVertexID].push_back(AdjVertexID);   // We connot merge these two lines because pushback returns void instead of a reference 
+                    Parent[src][AdjVertexID] = CurrVertexID; // update the parent node of this adj node in the shortest path.
+                    // Path[src][AdjVertexID] = Path[src][CurrVertexID];     // update shortest path to this adjacent vertex to "the path to the current vertex plus the edge between current edge and this adjacency. 
+                    // Path[src][AdjVertexID].push_back(AdjVertexID);   // We connot merge these two lines because pushback returns void instead of a reference 
                     //**** Remember, we pass in refernce of the DistanceBtwSrcAndDest and PathFromSrcToDest specific for this src and we shouldn't change the  DDistanceBtwEveryPair and DPathBtwEveryPair directly
-                    std::pair<double, TVertexID> UpdatedAdjVertexPair = std::make_pair(DistToAdj,AdjVertexID);
-                    PriorityQ.push(UpdatedAdjVertexPair);
+                    // std::pair<double, TVertexID> UpdatedAdjVertexPair = std::make_pair(DistToAdj,AdjVertexID);
+                    // PriorityQ.push(UpdatedAdjVertexPair);
+                    PriorityQ.emplace(DistToAdj,AdjVertexID);// this will save the cost of creating a new pair and copying everything
                 }
             }
         }
@@ -176,8 +179,9 @@ struct CDijkstraPathRouter::SImplementation{
         // use constructor to set every elenemt of DAdjacencies to inf meaning distance btw src and dest is infinity
         // use constructor toset every elenemt of DPathBtwEveryPair to empty vector meaning path btw src and dest is null.
         DDistanceBtwEveryPair = std::vector<std::vector<double>>(VertexCount(),std::vector<double>(VertexCount(),Inf));
-        DPathBtwEveryPair = std::vector<std::vector<std::vector<TVertexID>>>(VertexCount(),std::vector<std::vector<TVertexID>>(VertexCount(),std::vector<TVertexID>()));
-        
+        //DPathBtwEveryPair = std::vector<std::vector<std::vector<TVertexID>>>(VertexCount(),std::vector<std::vector<TVertexID>>(VertexCount(),std::vector<TVertexID>()));
+        DParentBtwEveryPair = std::vector<std::vector<TVertexID>>(VertexCount(),std::vector<TVertexID>(InvalidVertexID));
+
         // Use a nested for loop to initialize 2 dp tables -- Version 1
         // for (TVertexID i = 0; i < VertexCount(); i++){
         //     for (TVertexID j = 0; j < VertexCount(); j++){
@@ -191,7 +195,7 @@ struct CDijkstraPathRouter::SImplementation{
         
         // Run Dijkstra's algorithm on every vertex to find the shortest path/diatance from src to rest of the vertices in the graph and fill up the table
         for(TVertexID src = 0; src < VertexCount(); src++){
-            if(Dijkstra(src,DDistanceBtwEveryPair,DPathBtwEveryPair)){
+            if(Dijkstra(src,DDistanceBtwEveryPair,DParentBtwEveryPair)){
                 continue;
                 // Previous version -- create new containers instead of directly modifying DDistanceBtwEveryPair and DPathBtwEveryPair
                 // This will cost more space and time for copying, thus discard this method
@@ -223,7 +227,27 @@ struct CDijkstraPathRouter::SImplementation{
             return NoPathExists;
         }
         else{
-            path = DPathBtwEveryPair[src][dest];
+            // Since we only store the parent vertex instead of the whole path, we need to backtrack to get the whole path using a stack 
+            // Or we could just store the reverse-ordered path and reverse it to get the original order, which is faster and spend less space than pushing and poping onto a stack
+            // std::stack<TVertexID> StackOfVerticesInPath; 
+            TVertexID CurrVertex = dest;
+            // push everyting onto stack
+            while(CurrVertex != src){
+                if(CurrVertex == InvalidVertexID){
+                    return NoPathExists;
+                }
+                //StackOfVerticesInPath.push(CurrVertex);
+                path.push_back(CurrVertex);
+                CurrVertex = DParentBtwEveryPair[src][CurrVertex];
+            }
+            path.push_back(src);
+            std::reverse(path.begin(),path.end());
+            // StackOfVerticesInPath.push(src);
+            // // pop everything from stack in the order od the actual path and update it in path
+            // while(!StackOfVerticesInPath.empty()) {
+            //     path.push_back(StackOfVerticesInPath.top());
+            //     StackOfVerticesInPath.pop();
+            // }
             return dist;
         }
     }
