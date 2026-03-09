@@ -42,6 +42,17 @@ double SGeographicUtils::HaversineDistanceInMiles(CStreetMap::SLocation loc1, CS
     return 2 * EarthRadiusMiles * Computation;
 }
 
+/*
+ * Calculate the bearing (direction angle) from src to dest.
+ *
+ * The bearing represents the compass direction in degrees:
+ *   0°   = North
+ *   90°  = East
+ *   180° = South
+ *   -90° = West
+ *
+ * This is used when determining navigation directions or turns.
+ */
 double SGeographicUtils::CalculateBearing(CStreetMap::SLocation src, CStreetMap::SLocation dest){
     double LatRad1 = DegreesToRadians(src.DLatitude);
     double LatRad2 = DegreesToRadians(dest.DLatitude);
@@ -56,6 +67,14 @@ double SGeographicUtils::CalculateBearing(CStreetMap::SLocation src, CStreetMap:
 using std::cout;
 using std::endl;
 
+
+/*
+ * Calculate the external angle bisector between two bearings.
+ *
+ * This is used to determine turning direction at an intersection.
+ * The external bisector gives the direction opposite to the internal
+ * angle between two roads.
+ */
 double SGeographicUtils::CalculateExternalBisector(double bear1, double bear2){
     bear1 = Normalize360(bear1);
     bear2 = Normalize360(bear2);
@@ -73,6 +92,12 @@ double SGeographicUtils::CalculateExternalBisector(double bear1, double bear2){
     return Normalize180180(ExternalMid);
 }
 
+/*
+ * Convert a bearing angle into a compass direction string.
+ *
+ * Example outputs:
+ *   N, NE, E, SE, S, SW, W, NW
+ */
 std::string SGeographicUtils::BearingToDirection(double bearing){
     bearing = Normalize180180(bearing);
     if(-22.5 <= bearing){
@@ -108,6 +133,12 @@ std::string SGeographicUtils::BearingToDirection(double bearing){
     }
 }
 
+/*
+ * Determine the compass direction of the external angle bisector
+ * formed by three locations: src -> mid -> dest.
+ *
+ * Used to determine turn directions in navigation instructions.
+ */
 std::string SGeographicUtils::CalcualteExternalBisectorDirection(CStreetMap::SLocation src, CStreetMap::SLocation mid, CStreetMap::SLocation dest){
     double Bearing1 = CalculateBearing(mid,src);
     double Bearing2 = CalculateBearing(mid,dest);
@@ -121,6 +152,13 @@ std::string SGeographicUtils::CalcualteExternalBisectorDirection(CStreetMap::SLo
     return BearingToDirection(BisectorBearing);
 }
 
+/*
+ * Compute the bounding box (minimum and maximum coordinates)
+ * for a list of geographic locations.
+ *
+ * lowerleft  = minimum latitude and longitude
+ * upperright = maximum latitude and longitude
+ */
 bool SGeographicUtils::CalculateExtents(const std::vector<CStreetMap::SLocation> &locations, CStreetMap::SLocation &lowerleft, CStreetMap::SLocation &upperright){
     lowerleft.DLatitude = 90.0;
     lowerleft.DLongitude = 180.0;
@@ -144,6 +182,10 @@ bool SGeographicUtils::CalculateExtents(const std::vector<CStreetMap::SLocation>
     return !locations.empty();
 }
 
+/*
+ * Filter a list of locations and return only those that lie within
+ * the specified bounding box.
+ */
 std::vector<CStreetMap::SLocation> SGeographicUtils::FilterLocations(const std::vector<CStreetMap::SLocation> &locations, const CStreetMap::SLocation &lowerleft, const CStreetMap::SLocation &upperright){
     std::vector<CStreetMap::SLocation> Filtered;
     for(auto &Location : locations){
@@ -156,7 +198,15 @@ std::vector<CStreetMap::SLocation> SGeographicUtils::FilterLocations(const std::
 }  // LCOV_EXCL_LINE
 
 
-
+/*
+ * Convert latitude/longitude in decimal degrees to
+ * Degrees-Minutes-Seconds (DMS) format string.
+ *
+ * Example:
+ *   38.5382, -121.7617
+ * becomes:
+ *   38d 32' 17.52" N, 121d 45' 42.12" W
+ */
 std::string SGeographicUtils::ConvertLLToDMS(CStreetMap::SLocation loc){
     double Lat = loc.DLatitude;
     double Lon = loc.DLongitude;
