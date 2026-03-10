@@ -11,7 +11,7 @@ class CPathRouter{
         using TVertexID = std::size_t;
 
         static constexpr TVertexID InvalidVertexID = std::numeric_limits<TVertexID>::max();
-        inline static constexpr double NoPathExists = std::numeric_limits<double>::max();
+        static constexpr double NoPathExists = std::numeric_limits<double>::max();
 
         virtual ~CPathRouter(){};
 

@@ -185,7 +185,7 @@ struct CDijkstraPathRouter::SImplementation{
         // use constructor toset every elenemt of DPathBtwEveryPair to empty vector meaning path btw src and dest is null.
         DDistanceBtwEveryPair = std::vector<std::vector<double>>(VertexCount(),std::vector<double>(VertexCount(),Inf));
         //DPathBtwEveryPair = std::vector<std::vector<std::vector<TVertexID>>>(VertexCount(),std::vector<std::vector<TVertexID>>(VertexCount(),std::vector<TVertexID>()));
-        DParentBtwEveryPair = std::vector<std::vector<TVertexID>>(VertexCount(),std::vector<TVertexID>(InvalidVertexID));
+        DParentBtwEveryPair = std::vector<std::vector<TVertexID>>(VertexCount(),std::vector<TVertexID>(VertexCount(),InvalidVertexID));
 
         // Use a nested for loop to initialize 2 dp tables -- Version 1
         // for (TVertexID i = 0; i < VertexCount(); i++){
@@ -291,7 +291,7 @@ struct CDijkstraPathRouter::SImplementation{
     // bidir is set to true an additional edge between dest and src is added. If 
     // src or dest nodes do not exist, or if the weight is negative the AddEdge 
     // will return false, otherwise it returns true.
-    bool CDijkstraPathRouter::AddEdge(TVertexID src, TVertexID dest, double weight, bool bidir = false) noexcept{
+    bool CDijkstraPathRouter::AddEdge(TVertexID src, TVertexID dest, double weight, bool bidir) noexcept{
         return DImplementation->AddEdge(src, dest, weight, bidir);
     }
 

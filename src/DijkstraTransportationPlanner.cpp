@@ -311,8 +311,8 @@ struct CDijkstraTransportationPlanner::SImplementation{
         }
 
         // Get vertex id from the node id passed in.
-        CPathRouter::TVertexID srcVertex = DNodeToVertex[src];
-        CPathRouter::TVertexID destVertex = DNodeToVertex[dest];
+        CPathRouter::TVertexID SrcVertexID = DNodeToVertex[src];
+        CPathRouter::TVertexID DestVertexID = DNodeToVertex[dest];
 
         // To store user-defined struct in priority Q, we need ca ustom comparator struct
         struct ComparePlannerVertexPtr {
@@ -325,7 +325,7 @@ struct CDijkstraTransportationPlanner::SImplementation{
 
         // Initialization for Dijkstra: Start vertex
         auto SrcVertex = std::make_shared<PlannerVertex>();
-        SrcVertex->Vertex = srcVertex;
+        SrcVertex->Vertex = SrcVertexID;
         SrcVertex->TimeTraveled = 0;
         SrcVertex->CurrBusIndex = InvalidBusIndex;
         // SrcVertex->BusStopsPassed = 0;
@@ -335,10 +335,16 @@ struct CDijkstraTransportationPlanner::SImplementation{
 
         // Store the mintime from src to every vertex in the graph
         std::unordered_map<CPathRouter::TVertexID, double> MinTime;
-        MinTime[srcVertex] = 0;
+        MinTime[SrcVertexID] = 0;
 
+        // Create a new struct For parent info - make it easier to backtrack and get the info we need
+        struct ParentInfo {
+            CPathRouter::TVertexID PrevVertex;
+            ETransportationMode Mode;
+            size_t BusRouteIndex;
+        };
         // Parent map for backtrack
-        std::unordered_map<CPathRouter::TVertexID, PlannerVertex> Parent;
+        std::unordered_map<CPathRouter::TVertexID, ParentInfo> Parent;
 
         // Traverse all edge in the Dstreetmap and calculate different time for this edge via different transportation
         while(!PriorityQ.empty()){
@@ -357,7 +363,7 @@ struct CDijkstraTransportationPlanner::SImplementation{
             }
 
             // Stop if reach dest
-            if (CurrVertexID == destVertex) {
+            if (CurrVertexID == DestVertexID) {
                 break;
             }
             for (const auto &Edge : DAdjacencies[CurrVertexID]) {
@@ -379,22 +385,65 @@ struct CDijkstraTransportationPlanner::SImplementation{
                     // add one stoptime for each edge traversed, in this way, we only add stoptime for intermidiate stops
                     NextTime += DConfig->BusStopTime() / 3600.0;
                 }
+                // reset busindex if switch to walk
+                else if(Mode == ETransportationMode::Walk){
+                    NextBus = InvalidBusIndex;
+                }
 
-                // // 如果比之前更快，更新并加入队列
-                // if (MinTime.find(NextVertex) == MinTime.end() || NextTime < MinTime[NextVertex]) {
-                //     MinTime[NextVertex] = NextTime;
-                //     auto NextPtr = std::make_shared<PlannerVertex>();
-                //     NextPtr->Vertex = NextVertex;
-                //     NextPtr->TimeTraveled = NextTime;
-                //     NextPtr->CurrBusIndex = NextBus;
-                //     NextPtr->BusStopsPassed = NextStops;
+                NextTime += TravelTime;
 
-                //     Parent[NextVertex] = *CurrPtr; // 用于回溯路径
-                //     PriorityQ.push(NextPtr);
-                // }
+                // relax edge if possible
+                if (MinTime.find(NextVertex) == MinTime.end() || NextTime < MinTime[NextVertex]) {
+
+                    MinTime[NextVertex] = NextTime;
+
+                    auto NextPtr = std::make_shared<PlannerVertex>();
+                    NextPtr->Vertex = NextVertex;
+                    NextPtr->TimeTraveled = NextTime;
+                    NextPtr->CurrBusIndex = NextBus;
+
+                    Parent[NextVertex] = {CurrVertexID, Mode, NextBus};
+
+                    PriorityQ.push(NextPtr);
+                }
             }
         }
+        if (MinTime.find(DestVertexID) == MinTime.end()) {
+            return NoPathExists;
+        }
 
+        // Backtrack and construct path 
+        std::vector<TTripStep> ReverseTripSteps;
+
+        CPathRouter::TVertexID CurrVertexID = DestVertexID;
+
+        while (CurrVertexID != SrcVertexID) {
+            auto it = Parent.find(CurrVertexID);
+            
+            // if cannot find Parent，path doesn;t exist
+            if (it == Parent.end()) {           
+                path.clear();
+                return NoPathExists;
+            }
+            ParentInfo info = it->second;
+
+            // push node and curr node
+            ReverseTripSteps.push_back({info.Mode, DVertexToNode[CurrVertexID]});
+
+            // move to previous vertex
+            CurrVertexID = info.PrevVertex;
+        }
+
+        // Add src node（assume mode is Walk）
+        ReverseTripSteps.push_back({ETransportationMode::Walk, DVertexToNode[SrcVertexID]});
+
+        // reverse to get the order from src to dest
+        std::reverse(ReverseTripSteps.begin(), ReverseTripSteps.end());
+
+        // O(1) time move to path
+        path = std::move(ReverseTripSteps);
+
+        return MinTime[DestVertexID];
     }
 
     // Returns true if the path description is created. Takes the trip steps path
