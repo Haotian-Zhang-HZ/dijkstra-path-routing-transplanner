@@ -137,7 +137,7 @@ std::string SGeographicUtils::BearingToDirection(double bearing){
  * Determine the compass direction of the external angle bisector
  * formed by three locations: src -> mid -> dest.
  *
- * Used to determine turn directions in navigation instructions.
+ * Used to determine turn directions in navigation instructions.（转弯方向）
  */
 std::string SGeographicUtils::CalcualteExternalBisectorDirection(CStreetMap::SLocation src, CStreetMap::SLocation mid, CStreetMap::SLocation dest){
     double Bearing1 = CalculateBearing(mid,src);
@@ -153,7 +153,7 @@ std::string SGeographicUtils::CalcualteExternalBisectorDirection(CStreetMap::SLo
 }
 
 /*
- * Compute the bounding box (minimum and maximum coordinates)
+ * Compute the bounding box (minimum and maximum coordinates) 地图边界
  * for a list of geographic locations.
  *
  * lowerleft  = minimum latitude and longitude

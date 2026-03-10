@@ -4,6 +4,7 @@
 #include "PathRouter.h"
 #include "GeographicUtils.h"
 #include <unordered_map>
+#include <queue>
 #include <limits>
 
 struct CDijkstraTransportationPlanner::SImplementation{
@@ -17,17 +18,44 @@ struct CDijkstraTransportationPlanner::SImplementation{
     double DBikeSpeed;
     double DBusSpeed;
 
+    
+    static constexpr size_t InvalidBusIndex = std::numeric_limits<size_t>::max(); // Invalid busindex as default value
+    // In Dijkstra's priority queue, we want to store 1.traveling time to dest, 2.curr vertex, 3.Curr Busroute 4.number of intermidiate bus stops(for calculate stoptime)
+    // So, we need a new datastructure
+    struct PlannerVertex{
+        double TimeTraveled;
+        CPathRouter::TVertexID Vertex; 
+        size_t CurrBusIndex = InvalidBusIndex;
+        // size_t BusStopsPassed = 0; 
+        // Getter function interface
+
+        double GetTime() const {
+            return TimeTraveled;
+        }
+
+        CPathRouter::TVertexID GetVertexID() const{
+            return Vertex;
+        }
+
+        size_t GetBusIndex() const{
+            return CurrBusIndex;
+        }
+
+        // size_t GetStopsPassed() const {
+        //     return BusStopsPassed;
+        // }
+    };
+
     struct SPlannerEdge{
 
         CPathRouter::TVertexID DDest; // Since we use adjacency list to represent a graph, we don't need to store the src(adj list just store a verctor of dest mapping to a src)
         double DTime;
         ETransportationMode Mode;
+        size_t BusRouteIndex;
 
         SPlannerEdge(
-            CPathRouter::TVertexID dest, double Time, ETransportationMode mode) : DDest(dest), DTime(Time), Mode(mode){
-            // WalkTime = CanWalk ? DWeight / DWalkSpeed : std::numeric_limits<double>::infinity();
-            // BikeTime = CanBike ? DWeight / DBikeSpeed : std::numeric_limits<double>::infinity();
-            // BusTime  = CanBus  ? DWeight / DBusSpeed  : std::numeric_limits<double>::infinity();
+            CPathRouter::TVertexID dest, double Time, ETransportationMode mode, size_t busindex = InvalidBusIndex) : DDest(dest), DTime(Time), Mode(mode),BusRouteIndex(busindex) {
+
             }
 
         ~SPlannerEdge(){}
@@ -51,13 +79,25 @@ struct CDijkstraTransportationPlanner::SImplementation{
     std::vector<CStreetMap::TNodeID> DSortedNodeIDs;
     std::vector<std::vector<SPlannerEdge>> DAdjacencies; // Adjacency list of graph for planner
 
+    struct pairhash{
+        std::size_t operator()(const std::pair<TNodeID,TNodeID> &pair) const {
+            std::size_t First = pair.first;
+            std::size_t Second = pair.second;
+            return First ^ (Second<<1); 
+        }
+    };
+    std::unordered_map<std::pair<TNodeID,TNodeID>, double, pairhash> DMaxSpeedBtwNodes;
+
     // Initialize the streetmap and bussystem we use from the config and create a bus indexer and router in the constructor
     SImplementation(std::shared_ptr<SConfiguration> config) 
         :   DConfig(config),
             DStreetMap(config->StreetMap()),
             DBusSystem(config->BusSystem()),
             DBusIndexer(std::make_shared<CBusSystemIndexer>(DBusSystem)),
-            DRouter(std::make_shared<CDijkstraPathRouter>()){
+            DRouter(std::make_shared<CDijkstraPathRouter>()),
+            DWalkSpeed(config->WalkSpeed()),
+            DBikeSpeed(config->BikeSpeed()),
+            DBusSpeed(config->DefaultSpeedLimit()){
         
         // At this stage, we already know the number of vertices and by reserve() we save the time of copying everying and allocate new chunck of memory
         size_t NodeCount = DStreetMap->NodeCount();
@@ -84,7 +124,15 @@ struct CDijkstraTransportationPlanner::SImplementation{
         // Traverse each way in the map and traverse each adjacent node pair to create an edge between them 
         for(size_t WayIndex = 0; WayIndex < DStreetMap->WayCount(); WayIndex++){
             auto Way = DStreetMap->WayByIndex(WayIndex);
-            //Skip way that is not tagged with highway
+
+            // Extract speed limit if provided
+            double SpeedLimit = DBusSpeed; 
+            if(Way->HasAttribute("maxspeed")){
+                std::string SpeedStr = Way->GetAttribute("maxspeed");
+                SpeedLimit = std::stod(SpeedStr); // <tag k="maxspeed" v="25 mph"/>
+            }
+
+            // Skip way that is not tagged with highway
             if(!Way->HasAttribute("highway")){
                 continue;
             }
@@ -110,25 +158,36 @@ struct CDijkstraTransportationPlanner::SImplementation{
 
                 auto SrcNode = DStreetMap->NodeByID(SrcNodeID);
                 auto DestNode = DStreetMap->NodeByID(DestNodeID);
-                double distance = SGeographicUtils::HaversineDistanceInMiles(SrcNode->Location(), DestNode->Location()); 
+                double Distance = SGeographicUtils::HaversineDistanceInMiles(SrcNode->Location(), DestNode->Location()); 
 
                 // Walk edge
-                DAdjacencies[SrcVertexID].emplace_back(DestVertexID, distance, ETransportationMode::Walk);
+                double WalkTime = Distance / DWalkSpeed;
+                DAdjacencies[SrcVertexID].emplace_back(DestVertexID, WalkTime, ETransportationMode::Walk);
                 if(!oneway){
-                    DAdjacencies[DestVertexID].emplace_back(SrcVertexID, distance, ETransportationMode::Walk);
+                    DAdjacencies[DestVertexID].emplace_back(SrcVertexID, WalkTime, ETransportationMode::Walk);
                 }
+
                 // Bike edge
                 if(canBike){
-                    DAdjacencies[SrcVertexID].emplace_back(DestVertexID, distance, ETransportationMode::Bike);
+                    double BikeTime = Distance / DBikeSpeed;
+                    DAdjacencies[SrcVertexID].emplace_back(DestVertexID, BikeTime, ETransportationMode::Bike);
                     if(!oneway){
-                        DAdjacencies[DestVertexID].emplace_back(SrcVertexID, distance, ETransportationMode::Bike);
+                        DAdjacencies[DestVertexID].emplace_back(SrcVertexID, BikeTime, ETransportationMode::Bike);
                     }
                 }
                 
+                // Record street segment speed limit
+                DMaxSpeedBtwNodes[{SrcNodeID,DestNodeID}] = SpeedLimit;
+                if(!oneway){
+                    DMaxSpeedBtwNodes[{DestNodeID,SrcNodeID}] = SpeedLimit;
+                }
+
             }
         }
 
         // Process bussystem and add bus edge to it
+        // Note: we only record edge between busstop with the weight being the time traveled
+        // Adjacent busstop might not be adjacent nodes in the street map!
         for(size_t RouteIndex = 0; RouteIndex < DBusIndexer->RouteCount(); RouteIndex++){
             auto Route = DBusIndexer->SortedRouteByIndex(RouteIndex);
 
@@ -142,21 +201,46 @@ struct CDijkstraTransportationPlanner::SImplementation{
 
                 auto SrcStop = DBusSystem->StopByID(SrcStopID);
                 auto DestStop = DBusSystem->StopByID(DestStopID);
-                if (!SrcStop || !DestStop) {
+
+                if(!SrcStop || !DestStop){
                     continue;
-                } // Check for existence
+                }
 
                 TNodeID SrcNodeID = SrcStop->NodeID();
                 TNodeID DestNodeID = DestStop->NodeID();
 
-                auto SrcVertexID = DNodeToVertex[SrcNodeID];
-                auto DestVertexID = DNodeToVertex[DestNodeID];
+                // Adjacent stops mioght not be adjacent nodes in the map, 
+                // and bus follows the shortest path, so use Findshortest path to find the actual bus route on the map
+                // thus we can calculate the actual time between two busstops
+                std::vector<CPathRouter::TVertexID> StreetPath; // Bus path on street map- vector of vertex in grapph 
+                double StreetDistance = DRouter->FindShortestPath(DNodeToVertex[SrcNodeID],DNodeToVertex[DestNodeID],StreetPath);
 
-                auto SrcNode = DStreetMap->NodeByID(SrcNodeID);
-                auto DestNode = DStreetMap->NodeByID(DestNodeID);
-                double distance = SGeographicUtils::HaversineDistanceInMiles(SrcNode->Location(), DestNode->Location());
+                if(StreetDistance == NoPathExists){
+                    continue;
+                }
+                double BusTime = 0;
+                // NodeTraveledByBus is the node index traveled by bus in the path
+                // Calculate the time and distance btw each segment(adjacent nodes in map) of path
+                for(size_t NodeTraveledByBus = 0; NodeTraveledByBus + 1 < StreetPath.size(); NodeTraveledByBus++){
+                    TNodeID CurrNode = DVertexToNode[StreetPath[NodeTraveledByBus]];
+                    TNodeID NextNode = DVertexToNode[StreetPath[NodeTraveledByBus + 1]];
+                    double Distance = SGeographicUtils::HaversineDistanceInMiles(DStreetMap->NodeByID(CurrNode)->Location(), DStreetMap->NodeByID(NextNode)->Location());
 
-                DAdjacencies[SrcVertexID].emplace_back(DestVertexID, distance, ETransportationMode::Bus);
+                    double SpeedLimit = DBusSpeed; 
+                    auto It = DMaxSpeedBtwNodes.find({CurrNode, NextNode});
+                    if(It != DMaxSpeedBtwNodes.end()) {
+                        SpeedLimit = It->second;
+                    }
+                    BusTime += Distance / SpeedLimit;
+                }
+                if (!SrcStop || !DestStop) {
+                    continue;
+                } // Check for existence
+
+                CPathRouter::TVertexID SrcVertexID = DNodeToVertex[SrcNodeID];
+                CPathRouter::TVertexID DestVertexID = DNodeToVertex[DestNodeID];
+
+                DAdjacencies[SrcVertexID].emplace_back(DestVertexID, BusTime, ETransportationMode::Bus,RouteIndex);
             }
         }
     }
@@ -211,18 +295,105 @@ struct CDijkstraTransportationPlanner::SImplementation{
             return dist;
         }
     }
-
+    
+    
     // Returns the time in hours for the fastest path between the src and dest 
     // nodes of the if one exists. NoPathExists is returned if no path exists. 
     // The transportation mode and nodes of the fastest path are filled in the 
     // path parameter.
     // Implementation:
-    // Create a new graph with time as the weight of edge
+    // Traverse the graph with traveling time as the weight of edge(busstoptime is computed in running time)
     double FindFastestPath(TNodeID src, TNodeID dest, std::vector< TTripStep > &path){
         path.clear();
+        // Sanity check for src and dest
+        if(DNodeToVertex.find(src) == DNodeToVertex.end() || DNodeToVertex.find(dest) == DNodeToVertex.end()){
+            return NoPathExists;
+        }
+
+        // Get vertex id from the node id passed in.
+        CPathRouter::TVertexID srcVertex = DNodeToVertex[src];
+        CPathRouter::TVertexID destVertex = DNodeToVertex[dest];
+
+        // To store user-defined struct in priority Q, we need ca ustom comparator struct
+        struct ComparePlannerVertexPtr {
+            bool operator()(const std::shared_ptr<PlannerVertex> &a, const std::shared_ptr<PlannerVertex> &b) const {
+                return a->TimeTraveled > b->TimeTraveled; // min-heap
+            }
+        };
+
+        std::priority_queue< std::shared_ptr<PlannerVertex>, std::vector<std::shared_ptr<PlannerVertex>>, ComparePlannerVertexPtr> PriorityQ;
+
+        // Initialization for Dijkstra: Start vertex
+        auto SrcVertex = std::make_shared<PlannerVertex>();
+        SrcVertex->Vertex = srcVertex;
+        SrcVertex->TimeTraveled = 0;
+        SrcVertex->CurrBusIndex = InvalidBusIndex;
+        // SrcVertex->BusStopsPassed = 0;
+
+        PriorityQ.push(SrcVertex);
+
+
+        // Store the mintime from src to every vertex in the graph
+        std::unordered_map<CPathRouter::TVertexID, double> MinTime;
+        MinTime[srcVertex] = 0;
+
+        // Parent map for backtrack
+        std::unordered_map<CPathRouter::TVertexID, PlannerVertex> Parent;
 
         // Traverse all edge in the Dstreetmap and calculate different time for this edge via different transportation
-        for()
+        while(!PriorityQ.empty()){
+            // Extract and remove the vertex with min time from the src
+            auto CurrPtr = PriorityQ.top();
+            PriorityQ.pop();
+
+            auto CurrVertexID = CurrPtr->Vertex;
+            double CurrTime = CurrPtr->TimeTraveled;
+            size_t CurrBus = CurrPtr->CurrBusIndex;
+            // size_t StopsPassed = CurrPtr->BusStopsPassed;
+
+            // If the recorded min time beats the current time(get from Q), this current pair must be outdated data, so we could safely skip it.
+            if (MinTime.find(CurrVertexID) != MinTime.end() && CurrTime > MinTime[CurrVertexID]) {
+                continue;
+            }
+
+            // Stop if reach dest
+            if (CurrVertexID == destVertex) {
+                break;
+            }
+            for (const auto &Edge : DAdjacencies[CurrVertexID]) {
+
+                CPathRouter::TVertexID NextVertex = Edge.GetDestID();
+                double TravelTime = Edge.GetTime();// Traveling time of this edge
+                ETransportationMode Mode = Edge.Mode;// Travelin mode of this edge
+
+                double NextTime = CurrTime;
+                size_t NextBus = CurrBus;
+                // size_t NextStops = StopsPassed;
+
+                // Process stoptime if in bus mode
+                if (Mode == ETransportationMode::Bus) {
+                    // Get on a new bus, update bus info for next edge 
+                    if (CurrBus != Edge.BusRouteIndex) {
+                        NextBus = Edge.BusRouteIndex;
+                    }
+                    // add one stoptime for each edge traversed, in this way, we only add stoptime for intermidiate stops
+                    NextTime += DConfig->BusStopTime() / 3600.0;
+                }
+
+                // // 如果比之前更快，更新并加入队列
+                // if (MinTime.find(NextVertex) == MinTime.end() || NextTime < MinTime[NextVertex]) {
+                //     MinTime[NextVertex] = NextTime;
+                //     auto NextPtr = std::make_shared<PlannerVertex>();
+                //     NextPtr->Vertex = NextVertex;
+                //     NextPtr->TimeTraveled = NextTime;
+                //     NextPtr->CurrBusIndex = NextBus;
+                //     NextPtr->BusStopsPassed = NextStops;
+
+                //     Parent[NextVertex] = *CurrPtr; // 用于回溯路径
+                //     PriorityQ.push(NextPtr);
+                // }
+            }
+        }
 
     }
 

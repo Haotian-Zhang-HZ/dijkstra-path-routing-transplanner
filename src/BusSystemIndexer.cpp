@@ -56,19 +56,30 @@ struct CBusSystemIndexer::SImplementation{
             auto Route = DBussystem->RouteByIndex(Index1);
             DSortedRoutesByIndex.push_back(Route);
             // These 2 inner nested for loop are used to find all possible {src, dest} pairs and initialize DRoutesBetweenStops
-            for(size_t SrcIndex = 0; SrcIndex < Route->StopCount(); SrcIndex++){
-                for(size_t DestIndex = SrcIndex + 1; DestIndex < Route->StopCount(); DestIndex++){
-                    // Since there's no direct mapping from stop id to node id, we need to get the stop object ptr and then access it id
-                    // Both GetStopID and StopByID takes constant time.
-                    auto SrcStopID = Route->GetStopID(SrcIndex);// O(1)
-                    auto DestStopID = Route->GetStopID(DestIndex);
-                    auto SrcStop = DBussystem->StopByID(SrcStopID);// O(1)
-                    auto DestStop = DBussystem->StopByID(DestStopID);
-                    TNodeID SrcID = SrcStop->NodeID();
-                    TNodeID DestID = DestStop->NodeID();
-                    std::pair<TNodeID, TNodeID> Key = {SrcID, DestID};
-                    DRoutesBetweenStops[Key].insert(Route);
-                }
+            for(size_t SrcIndex = 0; SrcIndex + 1 < Route->StopCount(); SrcIndex++){
+                auto SrcStopID = Route->GetStopID(SrcIndex);// O(1)
+                auto DestStopID = Route->GetStopID(SrcIndex + 1);
+                auto SrcStop = DBussystem->StopByID(SrcStopID);// O(1)
+                auto DestStop = DBussystem->StopByID(DestStopID);
+
+                TNodeID SrcID = SrcStop->NodeID();
+                TNodeID DestID = DestStop->NodeID();
+
+                std::pair<TNodeID, TNodeID> Key = {SrcID, DestID};
+                DRoutesBetweenStops[Key].insert(Route);
+                // // Professor says in piazza that RoutesByNodeIDs only care about adjacent stops and the for loop below is no more needed
+                // for(size_t DestIndex = SrcIndex + 1; DestIndex < Route->StopCount(); DestIndex++){
+                //     // Since there's no direct mapping from stop id to node id, we need to get the stop object ptr and then access it id
+                //     // Both GetStopID and StopByID takes constant time.
+                //     auto SrcStopID = Route->GetStopID(SrcIndex);// O(1)
+                //     auto DestStopID = Route->GetStopID(DestIndex);
+                //     auto SrcStop = DBussystem->StopByID(SrcStopID);// O(1)
+                //     auto DestStop = DBussystem->StopByID(DestStopID);
+                //     TNodeID SrcID = SrcStop->NodeID();
+                //     TNodeID DestID = DestStop->NodeID();
+                //     std::pair<TNodeID, TNodeID> Key = {SrcID, DestID};
+                //     DRoutesBetweenStops[Key].insert(Route);
+                // }
             }
         }
         std::sort(DSortedRoutesByIndex.begin(),DSortedRoutesByIndex.end(),[](std::shared_ptr<SRoute> l,std::shared_ptr<SRoute> r){

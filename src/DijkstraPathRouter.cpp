@@ -27,7 +27,10 @@ struct CDijkstraPathRouter::SImplementation{
         TVertexID DDest; // Since we use adjacency list to represent a graph, we don't need to store the src(adj list just store a verctor of dest mapping to a src)
         double DWeight;
 
-        SEdge(TVertexID dest, double weight) : DDest(dest),DWeight(weight){}
+        // enum class ETransportationMode {Walk, Bike, Bus};
+        // ETransportationMode DMode; 
+
+        SEdge(TVertexID dest, double weight) : DDest(dest), DWeight(weight){}
 
         ~SEdge(){}
 
@@ -55,7 +58,9 @@ struct CDijkstraPathRouter::SImplementation{
     SImplementation(){
             
     }
-    ~SImplementation(){}
+    ~SImplementation(){
+
+    }
 
     // Returns the number of vertices in the path router
     // T(n) = O(1)
