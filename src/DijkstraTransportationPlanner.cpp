@@ -324,7 +324,9 @@ struct CDijkstraTransportationPlanner::SImplementation{
         CPathRouter::TVertexID SrcVertexID = DNodeToVertex[src];
         CPathRouter::TVertexID DestVertexID = DNodeToVertex[dest];
 
-        // To store user-defined struct in priority Q, we need ca ustom comparator struct
+
+        // Previous implementation store ptr in priority queue
+        /*
         struct ComparePlannerVertexPtr {
             bool operator()(const std::shared_ptr<PlannerVertex> &a, const std::shared_ptr<PlannerVertex> &b) const {
                 return a->TimeTraveled > b->TimeTraveled; // min-heap
@@ -332,7 +334,19 @@ struct CDijkstraTransportationPlanner::SImplementation{
         };
 
         std::priority_queue< std::shared_ptr<PlannerVertex>, std::vector<std::shared_ptr<PlannerVertex>>, ComparePlannerVertexPtr> PriorityQ;
+        */
+        
+        // Optimized version- store struct obj instead of ptr
+        // To store user-defined struct in priority Q, we need ca ustom comparator struct
+        struct ComparePlannerVertex{
+            bool operator()(const PlannerVertex& a,const PlannerVertex& b) const{
+                return a.TimeTraveled > b.TimeTraveled;
+            }
+        };
 
+        std::priority_queue< PlannerVertex, std::vector<PlannerVertex>, ComparePlannerVertex> PriorityQ;
+
+        /* Previous imple
         // Initialization for Dijkstra: Start vertex
         auto SrcVertex = std::make_shared<PlannerVertex>();
         SrcVertex->Vertex = SrcVertexID;
@@ -341,8 +355,10 @@ struct CDijkstraTransportationPlanner::SImplementation{
         // SrcVertex->BusStopsPassed = 0;
 
         PriorityQ.push(SrcVertex);
+        */
 
-
+        PriorityQ.push({0, SrcVertexID, InvalidBusIndex});
+        
         // Store the mintime from src to every vertex in the graph
         std::unordered_map<CPathRouter::TVertexID, double> MinTime;
         MinTime[SrcVertexID] = 0;
@@ -362,9 +378,9 @@ struct CDijkstraTransportationPlanner::SImplementation{
             auto CurrPtr = PriorityQ.top();
             PriorityQ.pop();
 
-            auto CurrVertexID = CurrPtr->Vertex;
-            double CurrTime = CurrPtr->TimeTraveled;
-            size_t CurrBus = CurrPtr->CurrBusIndex;
+            auto CurrVertexID = CurrPtr.Vertex;
+            double CurrTime = CurrPtr.TimeTraveled;
+            size_t CurrBus = CurrPtr.CurrBusIndex;
             // size_t StopsPassed = CurrPtr->BusStopsPassed;
 
             // If the recorded min time beats the current time(get from Q), this current pair must be outdated data, so we could safely skip it.
@@ -406,15 +422,17 @@ struct CDijkstraTransportationPlanner::SImplementation{
                 if (MinTime.find(NextVertex) == MinTime.end() || NextTime < MinTime[NextVertex]) {
 
                     MinTime[NextVertex] = NextTime;
-
-                    auto NextPtr = std::make_shared<PlannerVertex>();
-                    NextPtr->Vertex = NextVertex;
-                    NextPtr->TimeTraveled = NextTime;
-                    NextPtr->CurrBusIndex = NextBus;
-
+                    PriorityQ.push({NextTime, NextVertex, NextBus});
                     Parent[NextVertex] = {CurrVertexID, Mode, NextBus};
+                    // Previous Implementation
+                    // auto NextPtr = std::make_shared<PlannerVertex>();
+                    // NextPtr->Vertex = NextVertex;
+                    // NextPtr->TimeTraveled = NextTime;
+                    // NextPtr->CurrBusIndex = NextBus;
 
-                    PriorityQ.push(NextPtr);
+                    // Parent[NextVertex] = {CurrVertexID, Mode, NextBus};
+
+                    // PriorityQ.push(NextPtr);
                 }
             }
         }

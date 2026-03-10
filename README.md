@@ -284,3 +284,89 @@ Notes:
 If you want, I can also show a shortcut using HUGE_VAL, which is another legacy C-style way.
 
 Do you want me to show that too?
+
+
+
+### Prompt 5
+storing a struct obj or storing a shared_ptr to that struct in priority queue, which one is faster if we need to constantly push and pop from PQ
+
+### Response 5
+
+Ah, this is a classic performance tradeoff in C++ STL containers like std::priority_queue. Let’s break it down carefully.
+
+You’re asking about two options:
+	1.	Storing struct objects directly:
+
+struct Node { int x; double y; /* etc */ };
+std::priority_queue<Node> pq;
+
+
+	2.	Storing std::shared_ptr to struct objects:
+
+std::priority_queue<std::shared_ptr<Node>> pq;
+
+
+
+⸻
+
+1️⃣ Storing structs directly
+	•	Memory layout: Each element is fully contained in the container’s underlying storage (usually a std::vector).
+	•	Push/Pop cost:
+	•	When pushing/popping, std::priority_queue may move or copy the struct to maintain the heap invariant.
+	•	If your struct is small and trivially copyable (like a few ints/doubles), copying is very cheap.
+	•	Moving is also cheap if you define a move constructor (or let the compiler generate one).
+	•	Cache friendliness: Very good, because data is contiguous in memory.
+	•	Overhead: Minimal — just the cost of copying/moving structs.
+
+⸻
+
+2️⃣ Storing shared_ptr<Node>
+	•	Memory layout: The priority queue stores pointers, not the actual objects. The objects themselves live on the heap.
+	•	Push/Pop cost:
+	•	Each push/pop involves copying/moving a shared_ptr (cheap, just pointer + atomic ref count change).
+	•	But allocating the struct on the heap (std::make_shared<Node>()) is relatively expensive.
+	•	Every shared_ptr increment/decrement is an atomic operation, which is slower than a simple move of a struct.
+	•	Cache friendliness: Worse, because the objects are scattered in the heap.
+	•	Benefits: Useful if the objects are large, or need shared ownership across multiple containers.
+
+⸻
+
+⚡ Performance Rule of Thumb
+	•	Small structs (≤ a few dozen bytes) → store directly in PQ. Moving/copying is faster than heap allocation + shared_ptr overhead.
+	•	Large structs (> hundreds of bytes, or contain vectors/strings) → shared_ptr might make sense to avoid expensive copies.
+
+In your case:
+
+“we need to constantly push and pop from PQ”
+
+	•	You definitely want minimal overhead, so storing the struct directly is almost always faster for constant push/pop.
+	•	Only use shared_ptr if you need multiple owners of the same object or the struct is very large.
+
+⸻
+
+Example comparison (rough estimate)
+
+struct Small { int x, y; double z; }; // ~16 bytes
+std::priority_queue<Small> pq1;
+
+struct Large { std::vector<int> v; }; // ~24 bytes + heap
+std::priority_queue<std::shared_ptr<Large>> pq2;
+
+	•	pq1.push() / pop() is basically just memmove of 16 bytes → very fast.
+	•	pq2.push() / pop() requires:
+	1.	Allocating Large on heap (~100–1000 bytes depending on vector)
+	2.	Creating shared_ptr (atomic ref count)
+	3.	Copying pointer (~8 bytes) in the heap array → slower, more scattered memory → worse cache.
+
+⸻
+
+✅ Conclusion:
+	•	If your struct is small and you only need it inside the PQ → store the struct directly.
+	•	If your struct is large or needs shared ownership → shared_ptr.
+	•	For high-frequency push/pop (like in Dijkstra’s PQ), direct storage is almost always faster.
+
+⸻
+
+If you want, I can give a tiny benchmark showing push/pop speed difference between struct vs shared_ptr<struct> for a PQ — it’s surprisingly dramatic for small structs.
+
+Do you want me to do that?

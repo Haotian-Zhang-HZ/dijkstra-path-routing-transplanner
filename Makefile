@@ -40,16 +40,34 @@ TEST_CSVBSINDEX_OBJ_FILES = $(TESTOBJ_DIR)/StringDataSource.o $(TESTOBJ_DIR)/DSV
 TEST_OSM_OBJ_FILES = $(TESTOBJ_DIR)/StringDataSource.o $(TESTOBJ_DIR)/XMLReader.o $(TESTOBJ_DIR)/OpenStreetMap.o $(TESTOBJ_DIR)/OpenStreetMapTest.o
 TEST_DPR_OBJ_FILES = $(TESTOBJ_DIR)/DijkstraPathRouter.o $(TESTOBJ_DIR)/DijkstraPathRouterTest.o 
 TEST_CSVOSMTP_OBJ_FILES = \
-$(TESTOBJ_DIR)/StringDataSource.o \
-$(TESTOBJ_DIR)/DSVReader.o \
-$(TESTOBJ_DIR)/CSVBusSystem.o \
-$(TESTOBJ_DIR)/BusSystemIndexer.o \
-$(TESTOBJ_DIR)/XMLReader.o \
-$(TESTOBJ_DIR)/OpenStreetMap.o \
-$(TESTOBJ_DIR)/GeographicUtils.o \
-$(TESTOBJ_DIR)/DijkstraPathRouter.o \
-$(TESTOBJ_DIR)/DijkstraTransportationPlanner.o \
-$(TESTOBJ_DIR)/CSVOSMTransportationPlannerTest.o
+	$(TESTOBJ_DIR)/StringDataSource.o \
+	$(TESTOBJ_DIR)/DSVReader.o \
+	$(TESTOBJ_DIR)/CSVBusSystem.o \
+	$(TESTOBJ_DIR)/BusSystemIndexer.o \
+	$(TESTOBJ_DIR)/XMLReader.o \
+	$(TESTOBJ_DIR)/OpenStreetMap.o \
+	$(TESTOBJ_DIR)/GeographicUtils.o \
+	$(TESTOBJ_DIR)/DijkstraPathRouter.o \
+	$(TESTOBJ_DIR)/DijkstraTransportationPlanner.o \
+	$(TESTOBJ_DIR)/CSVOSMTransportationPlannerTest.o
+SPEEDTEST_OBJ_FILES = \
+    $(TESTOBJ_DIR)/DijkstraTransportationPlanner.o \
+    $(TESTOBJ_DIR)/OpenStreetMap.o \
+    $(TESTOBJ_DIR)/CSVBusSystem.o \
+    $(TESTOBJ_DIR)/StringUtils.o \
+    $(TESTOBJ_DIR)/speedtest.o \
+    $(TESTOBJ_DIR)/GeographicUtils.o \
+    $(TESTOBJ_DIR)/BusSystemIndexer.o \
+    $(TESTOBJ_DIR)/DSVReader.o \
+    $(TESTOBJ_DIR)/XMLReader.o \
+    $(TESTOBJ_DIR)/DijkstraPathRouter.o \
+    $(TESTOBJ_DIR)/FileDataFactory.o	\
+	$(TESTOBJ_DIR)/FileDataSource.o \
+	$(TESTOBJ_DIR)/FileDataSink.o \
+	$(TESTOBJ_DIR)/StandardDataSource.o \
+	$(TESTOBJ_DIR)/StandardDataSink.o  \
+	$(TESTOBJ_DIR)/StandardErrorDataSink.o \
+
 # Define the test target
 TEST_STR_TARGET	= $(TESTBIN_DIR)/teststrutils
 TEST_STRSRC_TARGET	= $(TESTBIN_DIR)/teststrdatasource 
@@ -63,6 +81,7 @@ TEST_CSVBSINDEX_TARGET = $(TESTBIN_DIR)/testcsvbsindexer
 TEST_OSM_TARGET	= $(TESTBIN_DIR)/testosm
 TEST_DPR_TARGET = $(TESTBIN_DIR)/testdijkstrapathrouter
 TEST_CSVOSMTP_TARGET = $(TESTBIN_DIR)/testcsvosmtransportationplanner
+SPEEDTEST_TARGET      = $(BIN_DIR)/speedtest
 
 all: directories \
 		run_strtest \
@@ -127,7 +146,8 @@ run_dtptest: $(TEST_CSVOSMTP_TARGET)
 	$(TEST_CSVOSMTP_TARGET) --gtest_filter=-CSVOSMTransporationPlanner.PathDescription --gtest_output=xml:$(TESTTMP_DIR)/$@
 	mv $(TESTTMP_DIR)/$@ $@
 
-
+run_speedtest: $(SPEEDTEST_TARGET)
+	$(SPEEDTEST_TARGET) --data=./data --results=./results --verbose
 
 gencoverage:
 	lcov --capture --directory . --output-file $(TESTCOVER_DIR)/coverage.info --ignore-errors inconsistent,source,count 2>/dev/null 
@@ -172,6 +192,12 @@ $(TEST_DPR_TARGET): $(TEST_DPR_OBJ_FILES)
 	
 $(TEST_CSVOSMTP_TARGET): $(TEST_CSVOSMTP_OBJ_FILES)
 	$(CXX) $(TEST_CFLAGS) $(TEST_CPPFLAGS) $(TEST_CSVOSMTP_OBJ_FILES) $(TEST_LDFLAGS) -o $(TEST_CSVOSMTP_TARGET)
+	
+$(SPEEDTEST_TARGET): $(SPEEDTEST_OBJ_FILES)
+	$(CXX) $(TEST_CFLAGS) $(TEST_CPPFLAGS) $(SPEEDTEST_OBJ_FILES) $(TEST_LDFLAGS) -o $@
+$(TESTOBJ_DIR)/%.o: $(TESTSRC_DIR)/%.cpp
+
+	$(CXX) $(TEST_CFLAGS) $(TEST_CPPFLAGS) $(DEFINES) $(INCLUDE) -c $< -o $@
 
 $(TESTOBJ_DIR)/%.o: $(SRC_DIR)/%.cpp
 	$(CXX) $(TEST_CFLAGS) $(TEST_CPPFLAGS) $(DEFINES) $(INCLUDE) -c $< -o $@
@@ -198,31 +224,14 @@ clean::
 
 .PHONY: clean
 
-SPEEDTEST_OBJ_FILES = \
-    $(TESTOBJ_DIR)/DijkstraTransportationPlanner.o \
-    $(TESTOBJ_DIR)/OpenStreetMap.o \
-    $(TESTOBJ_DIR)/CSVBusSystem.o \
-    $(TESTOBJ_DIR)/StringUtils.o \
-    $(TESTOBJ_DIR)/speedtest.o \
-    $(TESTOBJ_DIR)/GeographicUtils.o \
-    $(TESTOBJ_DIR)/BusSystemIndexer.o \
-    $(TESTOBJ_DIR)/DSVReader.o \
-    $(TESTOBJ_DIR)/XMLReader.o \
-    $(TESTOBJ_DIR)/DijkstraPathRouter.o \
-    $(TESTOBJ_DIR)/FileDataFactory.o	\
-	$(TESTOBJ_DIR)/FileDataSource.o \
-	$(TESTOBJ_DIR)/FileDataSink.o \
-	$(TESTOBJ_DIR)/StandardDataSource.o \
-	$(TESTOBJ_DIR)/StandardDataSink.o  \
-	$(TESTOBJ_DIR)/StandardErrorDataSink.o \
 
-SPEEDTEST_TARGET = $(BIN_DIR)/speedtest
+# SPEEDTEST_TARGET = $(BIN_DIR)/speedtest
 
-$(TESTOBJ_DIR)/%.o: $(SRC_DIR)/%.cpp
-	$(CXX) $(CFLAGS) $(CPPFLAGS) -I$(INC_DIR) -c $< -o $@
+# # $(TESTOBJ_DIR)/%.o: $(SRC_DIR)/%.cpp
+# # 	$(CXX) $(CFLAGS) $(CPPFLAGS) -I$(INC_DIR) -c $< -o $@
 
-$(SPEEDTEST_TARGET): $(SPEEDTEST_OBJ_FILES)
-	$(CXX) $(SPEEDTEST_OBJ_FILES) -o $(SPEEDTEST_TARGET) $(LDFLAGS)
+# $(SPEEDTEST_TARGET): $(SPEEDTEST_OBJ_FILES)
+# 	$(CXX) $(SPEEDTEST_OBJ_FILES) -o $(SPEEDTEST_TARGET) $(LDFLAGS)
 
-run_speedtest: $(SPEEDTEST_TARGET)
-	$(SPEEDTEST_TARGET) --data=./data --results=./results --verbose 
+# run_speedtest: $(SPEEDTEST_TARGET)
+# 	$(SPEEDTEST_TARGET) --data=./data --results=./results --verbose 
