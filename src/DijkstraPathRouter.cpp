@@ -50,10 +50,11 @@ struct CDijkstraPathRouter::SImplementation{
                                                   // I use a vector because it's faster (O(1)) to access an element than map (O(logV))
                                                   // And the instruction says that he vertex IDs do not have to match the node or stop IDs used by the other classes
     
-    std::vector<std::vector<double>> DDistanceBtwEveryPair; // create a dp table by using 2d array 
-                                                            // DDistanceBtwEveryPair[src][dest] stores the shortest distance btw src and dest where both src and dest are TVertexID which are just the indexes of this 2d array                                          
-    //std::vector<std::vector<std::vector<TVertexID>>> DPathBtwEveryPair; // DPathBtwEveryPair[src][dest] stores a vector of vertices, which include the path from src to dest
-    std::vector<std::vector<TVertexID>> DParentBtwEveryPair;// DParentBtwEveryPair[src][dest] stores the previous node of dest in the shortest path from src to dest and we can create the path by going from the dest to src(push into a stack and pop will give the right order)
+                                                  // Below are used for precompting the whole graoh with dijkstra, nolonger used
+    // std::vector<std::vector<double>> DDistanceBtwEveryPair; // create a dp table by using 2d array 
+    //                                                         // DDistanceBtwEveryPair[src][dest] stores the shortest distance btw src and dest where both src and dest are TVertexID which are just the indexes of this 2d array                                          
+    // //std::vector<std::vector<std::vector<TVertexID>>> DPathBtwEveryPair; // DPathBtwEveryPair[src][dest] stores a vector of vertices, which include the path from src to dest
+    // std::vector<std::vector<TVertexID>> DParentBtwEveryPair;// DParentBtwEveryPair[src][dest] stores the previous node of dest in the shortest path from src to dest and we can create the path by going from the dest to src(push into a stack and pop will give the right order)
     
     SImplementation(){
             
@@ -105,8 +106,173 @@ struct CDijkstraPathRouter::SImplementation{
         else{
             return false;
         }
+    }    
+
+    // Allows the path router to do any desired precomputation up to the deadline
+    bool Precompute(std::chrono::steady_clock::time_point deadline) noexcept{
+        return true;
+        /*
+        // Initialize 2 dp tables (size: VertexCount()*VertexCount()) -- Version 2
+        // use constructor to set every elenemt of DAdjacencies to inf meaning distance btw src and dest is infinity
+        // use constructor toset every elenemt of DPathBtwEveryPair to empty vector meaning path btw src and dest is null.
+        DDistanceBtwEveryPair = std::vector<std::vector<double>>(VertexCount(),std::vector<double>(VertexCount(),Inf));
+        //DPathBtwEveryPair = std::vector<std::vector<std::vector<TVertexID>>>(VertexCount(),std::vector<std::vector<TVertexID>>(VertexCount(),std::vector<TVertexID>()));
+        DParentBtwEveryPair = std::vector<std::vector<TVertexID>>(VertexCount(),std::vector<TVertexID>(VertexCount(),InvalidVertexID));
+
+        // Use a nested for loop to initialize 2 dp tables -- Version 1
+        // for (TVertexID i = 0; i < VertexCount(); i++){
+        //     for (TVertexID j = 0; j < VertexCount(); j++){
+        //         DDistanceBtwEveryPair[i][j] = Inf;
+        //         DPathBtwEveryPair[i][j] = {};
+        //     }
+        // }
+
+        // std::vector<double> DistanceBtwSrcAndDest; // This vector will store the dist btw src and dest in every execution of dijkstra 
+        // std::vector<std::vector<TVertexID>> PathFromSrcToDest; // This vector will store a vector of vertixes indicating path from src to dest in every execution of dijkstra 
+        
+        // Run Dijkstra's algorithm on every vertex to find the shortest path/diatance from src to rest of the vertices in the graph and fill up the table
+        for(TVertexID src = 0; src < VertexCount(); src++){
+            if(Dijkstra(src,DDistanceBtwEveryPair,DParentBtwEveryPair)){
+                continue;
+                // Previous version -- create new containers instead of directly modifying DDistanceBtwEveryPair and DPathBtwEveryPair
+                // This will cost more space and time for copying, thus discard this method
+                // // update the result (shortest path and distance from the src to rest of the vertices) after running dijkstra on each src
+                // for(TVertexID dest = 0; dest < VertexCount(); dest++ ){
+                //     DDistanceBtwEveryPair[src][dest] = DistanceBtwSrcAndDest[dest];
+                //     DPathBtwEveryPair[src][dest] = PathFromSrcToDest[dest];
+                // }
+            }
+            else{
+                return false;
+            }
+        }
+        return true;
+        */
     }
 
+    // Returns the path distance of the path from src to dest, and fills out path
+    // with vertices. If no path exists NoPathExists is returned.
+    double FindShortestPath(TVertexID src, TVertexID dest, std::vector<TVertexID> &path) noexcept{
+        // Sanity check
+        if(src >= VertexCount() || dest >=VertexCount()){
+            return NoPathExists;
+        }
+
+        path.clear();
+        // Single Dijkstra
+        std::vector<double> Distance(VertexCount(), Inf);
+        std::vector<TVertexID> Parent(VertexCount(), InvalidVertexID);
+
+        // Initialize Src vertex
+        Distance[src] = 0;
+        Parent[src] = src;
+
+        // Initialize a priority queue
+        using PriorityQElement = std::pair<double, TVertexID>;
+        std::priority_queue<PriorityQElement, std::vector<PriorityQElement>, std::greater<PriorityQElement>> PriorityQ;
+        PriorityQ.emplace(0, src);
+
+        while (!PriorityQ.empty()) {
+            auto PriorityQPair = PriorityQ.top(); 
+            double CurrDist = PriorityQPair.first;
+            TVertexID CurrVertexID = PriorityQPair.second;
+            PriorityQ.pop();
+
+            // When we pop the dest the shortest path of it has been finalized,just end here
+            if (CurrVertexID == dest) {
+                break;
+            }
+            //****** Important!!! Since our Priority Queue doesn't support decreasekey and might contain outdated shortest dist value so we want to skip that to speed up!
+            // What we can do is simply compare (the distance btw src and CurrVertexID)(-> this is what we get from priority queue) with the current best distance (-> this is stored in Distance)
+            // If the recorded shortest distance beats the current distance(get from Q), this current pair must be outdated data, so we could safely skip it.
+            if (CurrDist > Distance[CurrVertexID]) {
+                continue;
+            }
+
+            for (const auto& AdjEdge : DAdjacencies[CurrVertexID]) {
+
+                TVertexID AdjVertexID = AdjEdge->GetDestID();// Get the vertex ID of the adjacent vertex
+
+                // And relax edge if necessary
+                double Weight = AdjEdge->GetWeight();
+                if (Distance[AdjVertexID] > CurrDist + Weight) {
+                    Distance[AdjVertexID] = CurrDist + Weight;//
+                    Parent[AdjVertexID] = CurrVertexID; 
+                    PriorityQ.emplace(Distance[AdjVertexID], AdjVertexID);
+                }
+            }
+        }
+
+        if (Distance[dest] == Inf) {
+            return NoPathExists;
+        }
+
+        // backtrack path with Parent 
+        TVertexID CurrID = dest;
+        while (CurrID != src) {
+            if (CurrID == InvalidVertexID) {
+                return NoPathExists;
+            } 
+            path.push_back(CurrID);
+            CurrID = Parent[CurrID];
+        }
+        // Need to add the src
+        path.push_back(src);
+        std::reverse(path.begin(), path.end());
+
+        return Distance[dest];
+    }
+};
+
+/////////////////////////CDijkstraPathRouter Member function definition////////////////////////////
+
+
+    // Constructor for the Dijkstra Path Router
+    CDijkstraPathRouter::CDijkstraPathRouter(){
+        DImplementation = std::make_unique<SImplementation>();
+    }
+
+    // Destructor for the Dijkstra Path Router
+    CDijkstraPathRouter::~CDijkstraPathRouter(){
+
+    }
+
+    // Returns the number of vertices in the path router
+    std::size_t CDijkstraPathRouter::VertexCount() const noexcept{
+        return DImplementation->VertexCount();
+    }
+
+    // Adds a vertex with the tag provided. The tag can be of any type.
+    CPathRouter::TVertexID CDijkstraPathRouter::AddVertex(std::any tag) noexcept{
+        return DImplementation->AddVertex(tag);
+    }
+
+    // Gets the tag of the vertex specified by id if id is in the path router.
+    // A std::any() is returned if id is not a valid vertex ID.
+    std::any CDijkstraPathRouter::GetVertexTag(TVertexID id) const noexcept{
+        return DImplementation->GetVertexTag(id);
+    }
+
+    // Adds an edge between src and dest vertices with a weight of weight. If 
+    // bidir is set to true an additional edge between dest and src is added. If 
+    // src or dest nodes do not exist, or if the weight is negative the AddEdge 
+    // will return false, otherwise it returns true.
+    bool CDijkstraPathRouter::AddEdge(TVertexID src, TVertexID dest, double weight, bool bidir) noexcept{
+        return DImplementation->AddEdge(src, dest, weight, bidir);
+    }
+
+    // Allows the path router to do any desired precomputation up to the deadline
+    bool CDijkstraPathRouter::Precompute(std::chrono::steady_clock::time_point deadline) noexcept{
+        return DImplementation->Precompute(deadline);
+    }
+
+    // Returns the path distance of the path from src to dest, and fills out path
+    // with vertices. If no path exists NoPathExists is returned.
+    double CDijkstraPathRouter::FindShortestPath(TVertexID src, TVertexID dest, std::vector<TVertexID> &path) noexcept{
+        return DImplementation->FindShortestPath(src, dest, path);
+    }
+
+    /* This dijkstra uesed to be desighed for precomputing the whole graph, no longer used
     // Helper function that run Dijkstra on the vertex passed in and update the shortest distance ang path btw the src and dest(rest of the verttices in the graph)
     // What I've changed/done to make it faster:
     //      1. pass in reference of the original dp table instead of storing the shortest dist and path relate to curr src in 2 extra containers that are passed in into Dijkstra
@@ -176,132 +342,4 @@ struct CDijkstraPathRouter::SImplementation{
         }
         return true;
     }
-
-    // Allows the path router to do any desired precomputation up to the deadline
-    bool Precompute(std::chrono::steady_clock::time_point deadline) noexcept{
-
-        // Initialize 2 dp tables (size: VertexCount()*VertexCount()) -- Version 2
-        // use constructor to set every elenemt of DAdjacencies to inf meaning distance btw src and dest is infinity
-        // use constructor toset every elenemt of DPathBtwEveryPair to empty vector meaning path btw src and dest is null.
-        DDistanceBtwEveryPair = std::vector<std::vector<double>>(VertexCount(),std::vector<double>(VertexCount(),Inf));
-        //DPathBtwEveryPair = std::vector<std::vector<std::vector<TVertexID>>>(VertexCount(),std::vector<std::vector<TVertexID>>(VertexCount(),std::vector<TVertexID>()));
-        DParentBtwEveryPair = std::vector<std::vector<TVertexID>>(VertexCount(),std::vector<TVertexID>(VertexCount(),InvalidVertexID));
-
-        // Use a nested for loop to initialize 2 dp tables -- Version 1
-        // for (TVertexID i = 0; i < VertexCount(); i++){
-        //     for (TVertexID j = 0; j < VertexCount(); j++){
-        //         DDistanceBtwEveryPair[i][j] = Inf;
-        //         DPathBtwEveryPair[i][j] = {};
-        //     }
-        // }
-
-        // std::vector<double> DistanceBtwSrcAndDest; // This vector will store the dist btw src and dest in every execution of dijkstra 
-        // std::vector<std::vector<TVertexID>> PathFromSrcToDest; // This vector will store a vector of vertixes indicating path from src to dest in every execution of dijkstra 
-        
-        // Run Dijkstra's algorithm on every vertex to find the shortest path/diatance from src to rest of the vertices in the graph and fill up the table
-        for(TVertexID src = 0; src < VertexCount(); src++){
-            if(Dijkstra(src,DDistanceBtwEveryPair,DParentBtwEveryPair)){
-                continue;
-                // Previous version -- create new containers instead of directly modifying DDistanceBtwEveryPair and DPathBtwEveryPair
-                // This will cost more space and time for copying, thus discard this method
-                // // update the result (shortest path and distance from the src to rest of the vertices) after running dijkstra on each src
-                // for(TVertexID dest = 0; dest < VertexCount(); dest++ ){
-                //     DDistanceBtwEveryPair[src][dest] = DistanceBtwSrcAndDest[dest];
-                //     DPathBtwEveryPair[src][dest] = PathFromSrcToDest[dest];
-                // }
-            }
-            else{
-                return false;
-            }
-        }
-        return true;
-    }
-
-    // Returns the path distance of the path from src to dest, and fills out path
-    // with vertices. If no path exists NoPathExists is returned.
-    double FindShortestPath(TVertexID src, TVertexID dest, std::vector<TVertexID> &path) noexcept{
-        // Sanity check
-        if(src >= VertexCount() || dest >=VertexCount()){
-            return NoPathExists;
-        }
-
-        path.clear();
-
-        double dist = DDistanceBtwEveryPair[src][dest];
-        if(dist == Inf){
-            return NoPathExists;
-        }
-        else{
-            // Since we only store the parent vertex instead of the whole path, we need to backtrack to get the whole path using a stack 
-            // Or we could just store the reverse-ordered path and reverse it to get the original order, which is faster and spend less space than pushing and poping onto a stack
-            // std::stack<TVertexID> StackOfVerticesInPath; 
-            TVertexID CurrVertex = dest;
-            // push everyting onto stack
-            while(CurrVertex != src){
-                if(CurrVertex == InvalidVertexID){
-                    return NoPathExists;
-                }
-                //StackOfVerticesInPath.push(CurrVertex);
-                path.push_back(CurrVertex);
-                CurrVertex = DParentBtwEveryPair[src][CurrVertex];
-            }
-            path.push_back(src);
-            std::reverse(path.begin(),path.end());
-            // StackOfVerticesInPath.push(src);
-            // // pop everything from stack in the order od the actual path and update it in path
-            // while(!StackOfVerticesInPath.empty()) {
-            //     path.push_back(StackOfVerticesInPath.top());
-            //     StackOfVerticesInPath.pop();
-            // }
-            return dist;
-        }
-    }
-};
-
-/////////////////////////CDijkstraPathRouter Member function definition////////////////////////////
-
-
-    // Constructor for the Dijkstra Path Router
-    CDijkstraPathRouter::CDijkstraPathRouter(){
-        DImplementation = std::make_unique<SImplementation>();
-    }
-
-    // Destructor for the Dijkstra Path Router
-    CDijkstraPathRouter::~CDijkstraPathRouter(){
-
-    }
-
-    // Returns the number of vertices in the path router
-    std::size_t CDijkstraPathRouter::VertexCount() const noexcept{
-        return DImplementation->VertexCount();
-    }
-
-    // Adds a vertex with the tag provided. The tag can be of any type.
-    CPathRouter::TVertexID CDijkstraPathRouter::AddVertex(std::any tag) noexcept{
-        return DImplementation->AddVertex(tag);
-    }
-
-    // Gets the tag of the vertex specified by id if id is in the path router.
-    // A std::any() is returned if id is not a valid vertex ID.
-    std::any CDijkstraPathRouter::GetVertexTag(TVertexID id) const noexcept{
-        return DImplementation->GetVertexTag(id);
-    }
-
-    // Adds an edge between src and dest vertices with a weight of weight. If 
-    // bidir is set to true an additional edge between dest and src is added. If 
-    // src or dest nodes do not exist, or if the weight is negative the AddEdge 
-    // will return false, otherwise it returns true.
-    bool CDijkstraPathRouter::AddEdge(TVertexID src, TVertexID dest, double weight, bool bidir) noexcept{
-        return DImplementation->AddEdge(src, dest, weight, bidir);
-    }
-
-    // Allows the path router to do any desired precomputation up to the deadline
-    bool CDijkstraPathRouter::Precompute(std::chrono::steady_clock::time_point deadline) noexcept{
-        return DImplementation->Precompute(deadline);
-    }
-
-    // Returns the path distance of the path from src to dest, and fills out path
-    // with vertices. If no path exists NoPathExists is returned.
-    double CDijkstraPathRouter::FindShortestPath(TVertexID src, TVertexID dest, std::vector<TVertexID> &path) noexcept{
-        return DImplementation->FindShortestPath(src, dest, path);
-    }
+    */

@@ -116,7 +116,6 @@ struct CDijkstraTransportationPlanner::SImplementation{
             DVertexToNode[VertexID] = NodeID;
             DSortedNodeIDs.push_back(NodeID); 
         }
-
         // Sort nodeid by index
         std::sort(DSortedNodeIDs.begin(),DSortedNodeIDs.end()); 
 
@@ -130,11 +129,6 @@ struct CDijkstraTransportationPlanner::SImplementation{
             if(Way->HasAttribute("maxspeed")){
                 std::string SpeedStr = Way->GetAttribute("maxspeed");
                 SpeedLimit = std::stod(SpeedStr); // <tag k="maxspeed" v="25 mph"/>
-            }
-
-            // Skip way that is not tagged with highway
-            if(!Way->HasAttribute("highway")){
-                continue;
             }
 
             // Check for one-way or not
@@ -153,21 +147,34 @@ struct CDijkstraTransportationPlanner::SImplementation{
                 auto SrcNodeID = Way->GetNodeID(NodeIndex);
                 auto DestNodeID = Way->GetNodeID(NodeIndex+1);
 
-                auto SrcVertexID = DNodeToVertex[SrcNodeID];
-                auto DestVertexID = DNodeToVertex[DestNodeID];
+                auto SrcIt = DNodeToVertex.find(SrcNodeID);
+                auto DestIt = DNodeToVertex.find(DestNodeID);
+
+                if(SrcIt == DNodeToVertex.end() || DestIt == DNodeToVertex.end()){
+                    continue;
+                }
+
+                auto SrcVertexID = SrcIt->second;
+                auto DestVertexID = DestIt->second;
 
                 auto SrcNode = DStreetMap->NodeByID(SrcNodeID);
                 auto DestNode = DStreetMap->NodeByID(DestNodeID);
                 double Distance = SGeographicUtils::HaversineDistanceInMiles(SrcNode->Location(), DestNode->Location()); 
 
-                // Walk edge
+                // Add edge to router (weight = physical distance) 
+                DRouter->AddEdge(SrcVertexID, DestVertexID, Distance);
+                if (!oneway) {
+                    DRouter->AddEdge(DestVertexID, SrcVertexID, Distance);
+                }
+                
+                // Walk edge for Planner time-weighted
                 double WalkTime = Distance / DWalkSpeed;
                 DAdjacencies[SrcVertexID].emplace_back(DestVertexID, WalkTime, ETransportationMode::Walk);
                 if(!oneway){
                     DAdjacencies[DestVertexID].emplace_back(SrcVertexID, WalkTime, ETransportationMode::Walk);
                 }
 
-                // Bike edge
+                // Bike edge for planner time-weighted
                 if(canBike){
                     double BikeTime = Distance / DBikeSpeed;
                     DAdjacencies[SrcVertexID].emplace_back(DestVertexID, BikeTime, ETransportationMode::Bike);
@@ -243,6 +250,8 @@ struct CDijkstraTransportationPlanner::SImplementation{
                 DAdjacencies[SrcVertexID].emplace_back(DestVertexID, BusTime, ETransportationMode::Bus,RouteIndex);
             }
         }
+        
+        //DRouter->Precompute(std::chrono::steady_clock::now() + std::chrono::seconds(30));
     }
 
     ~SImplementation(){
@@ -258,6 +267,7 @@ struct CDijkstraTransportationPlanner::SImplementation{
     // NodeCount(). nullptr is returned if index is greater than or equal to 
     // NodeCount(). The nodes are sorted by Node ID.
     std::shared_ptr<CStreetMap::SNode> SortedNodeByIndex(std::size_t index) const noexcept{
+
         if(index < NodeCount()){
             return DStreetMap->NodeByID(DSortedNodeIDs[index]);// DSortedNodeIDs[index] gets the sorted nodeid by index, NodeByID gets teh node ptr by nodeid
         }
@@ -427,16 +437,26 @@ struct CDijkstraTransportationPlanner::SImplementation{
             }
             ParentInfo info = it->second;
 
-            // push node and curr node
+             // push current node with edge mode to previous node
             ReverseTripSteps.push_back({info.Mode, DVertexToNode[CurrVertexID]});
 
             // move to previous vertex
             CurrVertexID = info.PrevVertex;
         }
 
-        // Add src node（assume mode is Walk）
-        ReverseTripSteps.push_back({ETransportationMode::Walk, DVertexToNode[SrcVertexID]});
-
+        // Determine src node's mode based on first edge
+        if (!ReverseTripSteps.empty()) {
+            ETransportationMode FirstMode = ReverseTripSteps.back().first;
+            if (FirstMode == ETransportationMode::Bike) {
+                ReverseTripSteps.push_back({ETransportationMode::Bike, DVertexToNode[SrcVertexID]});
+            } else {
+                ReverseTripSteps.push_back({ETransportationMode::Walk, DVertexToNode[SrcVertexID]});
+            }
+        } else {
+            // src == dest, assume Walk
+            ReverseTripSteps.push_back({ETransportationMode::Walk, DVertexToNode[SrcVertexID]});
+        }
+        
         // reverse to get the order from src to dest
         std::reverse(ReverseTripSteps.begin(), ReverseTripSteps.end());
 

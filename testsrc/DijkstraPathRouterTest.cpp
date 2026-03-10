@@ -66,7 +66,7 @@ TEST(DijkstraPathRouter, AddEdgeBidirectional){
 
     EXPECT_TRUE(PathRouter.AddEdge(A, B, 3.0, true));
     std::vector<CPathRouter::TVertexID> Path;
-    PathRouter.Precompute(std::chrono::steady_clock::now() + std::chrono::seconds(10));
+    PathRouter.Precompute(std::chrono::steady_clock::now() + std::chrono::seconds(30));
 
     EXPECT_EQ(PathRouter.FindShortestPath(A, B, Path), 3.0);
     EXPECT_EQ(PathRouter.FindShortestPath(B, A, Path), 3.0);
@@ -81,7 +81,7 @@ TEST(DijkstraPathRouter, NoPath){
 
     EXPECT_TRUE(PathRouter.AddEdge(A, B, 1.0)); // C disconnected
     std::vector<CPathRouter::TVertexID> Path;
-    PathRouter.Precompute(std::chrono::steady_clock::now() + std::chrono::seconds(10));
+    PathRouter.Precompute(std::chrono::steady_clock::now() + std::chrono::seconds(30));
 
     EXPECT_EQ(PathRouter.FindShortestPath(A, C, Path), CPathRouter::NoPathExists);
     EXPECT_TRUE(Path.empty());
@@ -93,7 +93,7 @@ TEST(DijkstraPathRouter, SelfLoop){
     auto A = PathRouter.AddVertex("A");
     EXPECT_TRUE(PathRouter.AddEdge(A, A, 2.0)); // self loop
     std::vector<CPathRouter::TVertexID> Path;
-    PathRouter.Precompute(std::chrono::steady_clock::now() + std::chrono::seconds(10));
+    PathRouter.Precompute(std::chrono::steady_clock::now() + std::chrono::seconds(30));
     EXPECT_EQ(PathRouter.FindShortestPath(A, A, Path), 0.0);
     EXPECT_EQ(Path.size(), 1);
 }
@@ -121,7 +121,7 @@ TEST(DijkstraPathRouter, MultipleShortestPaths){
     EXPECT_TRUE(PathRouter.AddEdge(C,E,1.0));
 
     std::vector<CPathRouter::TVertexID> Path;
-    PathRouter.Precompute(std::chrono::steady_clock::now() + std::chrono::seconds(10));
+    PathRouter.Precompute(std::chrono::steady_clock::now() + std::chrono::seconds(30));
 
     EXPECT_EQ(PathRouter.FindShortestPath(A,D,Path), 2.0);
     EXPECT_TRUE((Path == std::vector<CPathRouter::TVertexID>{A,B,D} || Path == std::vector<CPathRouter::TVertexID>{A,C,D}));
