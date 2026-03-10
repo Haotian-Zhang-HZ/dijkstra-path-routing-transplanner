@@ -52,9 +52,7 @@ TEST_CSVBSINDEX_TARGET = $(TESTBIN_DIR)/testcsvbsindexer
 TEST_OSM_TARGET	= $(TESTBIN_DIR)/testosm
 TEST_DPR_TARGET = $(TESTBIN_DIR)/testdijkstrapathrouter
 
-
 all: directories \
-		run_dprtest		\
 		run_strtest \
 		run_strsrctest \
 		run_strsinktest \
@@ -64,6 +62,8 @@ all: directories \
 		run_xmltest \
 		run_csvbsindextest \
 		run_osmtest   \
+		run_csvbstest \
+		run_dprtest		\
 		gencoverage
 
 run_strtest: $(TEST_STR_TARGET)
@@ -172,6 +172,6 @@ clean::
 	rm -rf $(TESTOBJ_DIR)
 	rm -rf $(TESTCOVER_DIR)
 	rm -rf $(TESTTMP_DIR)
-	rm -f run_strtest run_strsrctest run_strsinktest run_dsvtest run_xmltest run_csvbstest run_osmtest run_filesstest run_geoutilstest run_csvbsindextest
+	rm -f run_strtest run_strsrctest run_strsinktest run_dsvtest run_xmltest run_csvbstest run_osmtest run_filesstest run_geoutilstest run_csvbsindextest run_dprtest
 
 .PHONY: clean
