@@ -76,15 +76,7 @@ struct CTransportationPlannerCommandLine::SImplementation{
                 if(CMD.empty()){
                     continue;
                 }
-                // The split function I wrote doesn't support split on multiple spaces 
-                // std::vector< std::string > CMDS = StringUtils::Split(CMD," ");
-                std::vector< std::string > CMDS;
-                // This will treat multiple spaces as one and could split on that 
-                std::istringstream iss(CMD);
-                std::string Element;
-                while (iss >> Element) {
-                    CMDS.push_back(Element);
-                }
+                std::vector< std::string > CMDS = StringUtils::Split(CMD);
                 // output help info
                 if(CMDS[0] == "help"){
                     OutSink->Write(std::vector<char>(LINE1.begin(),LINE1.end()));

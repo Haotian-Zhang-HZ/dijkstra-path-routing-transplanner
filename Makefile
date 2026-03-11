@@ -19,7 +19,7 @@ TESTTMP_DIR		= ./testtmp
 PKGS			= expat
 DEFINES			= 
 INCLUDE			+= -I $(INC_DIR) 
-CFLAGS			+= `pkg-config --cflags $(PKGS)`
+CFLAGS			+= -O0 `pkg-config --cflags $(PKGS)`
 CPPFLAGS		+= -std=c++20
 LDFLAGS			= `pkg-config --libs $(PKGS)`
 
@@ -75,6 +75,7 @@ SPEEDTEST_OBJ_FILES = \
 	$(TESTOBJ_DIR)/StandardDataSink.o  \
 	$(TESTOBJ_DIR)/StandardErrorDataSink.o 
 TRANSP_OBJ_FILES = \
+	$(OBJ_DIR)/transplanner.o \
     $(OBJ_DIR)/TransportationPlannerCommandLine.o \
     $(OBJ_DIR)/DijkstraTransportationPlanner.o \
     $(OBJ_DIR)/OpenStreetMap.o \
@@ -88,7 +89,11 @@ TRANSP_OBJ_FILES = \
     $(OBJ_DIR)/FileDataSink.o \
     $(OBJ_DIR)/StringUtils.o \
     $(OBJ_DIR)/StringDataSink.o \
-    $(OBJ_DIR)/StringDataSource.o
+    $(OBJ_DIR)/StringDataSource.o \
+	$(OBJ_DIR)/StandardDataSource.o \
+    $(OBJ_DIR)/StandardDataSink.o \
+    $(OBJ_DIR)/StandardErrorDataSink.o \
+	$(OBJ_DIR)/DijkstraPathRouter.o
 
 # Define the test target
 TEST_STR_TARGET	= $(TESTBIN_DIR)/teststrutils
@@ -179,13 +184,16 @@ run_speedtest: $(SPEEDTEST_TARGET)
 	$(SPEEDTEST_TARGET) --data=./data --results=./results --verbose
 
 run_transpl: $(TRANSP_TARGET)
-	$(TRANSP_TARGET) --data=./data --results=./results --verbose
+	$(TRANSP_TARGET) --data=./data --results=./results 
 
 gencoverage:
 	lcov --capture --directory . --output-file $(TESTCOVER_DIR)/coverage.info --ignore-errors inconsistent,source,count 2>/dev/null 
 	lcov --remove $(TESTCOVER_DIR)/coverage.info '/usr/*' '*/testsrc/*' '*/include/*' --output-file $(TESTCOVER_DIR)/coverage.info
 	genhtml $(TESTCOVER_DIR)/coverage.info --output-directory $(TESTCOVER_DIR)
-
+	@echo ""
+	@echo "Note: 'run_transpl' is an interactive test. Run it separately with 'make run_transpl'."
+	@echo ""
+	
 $(TEST_STR_TARGET): $(TEST_STR_OBJ_FILES)
 	$(CXX) $(TEST_CFLAGS) $(TEST_CPPFLAGS) $(TEST_STR_OBJ_FILES) $(TEST_LDFLAGS) -o $(TEST_STR_TARGET)
 
