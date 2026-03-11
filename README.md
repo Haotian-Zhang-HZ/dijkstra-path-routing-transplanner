@@ -2,24 +2,35 @@
 
 Student 1: Haotian Zhang (923663223)
 
+About Partner Issue:
 I am working alone on this project because my ex-partner has been completely unreachable and never attends class. I have tried to find another classmate to work with, but everyone who regularly attends lectures already has a partner. As a result, I have been unable to find a reliable partner for this project.
 
 ## Project Status
-
+- Project Completed.  
+- All `CTransportationPlannerCommandLine`, `CDijkstraTransportationPlanner`, `CDijkstraPathRouter`, and `CCSVBusSystemIndexer` functions have been implemented and tested.  
+- Google Tests pass successfully and provide decent coverage for all implemented modules.  
+- All required behaviors and command-line interactions specified in the project description have been implemented.
 
 ## Known Issues
 - No known issues at this stage. 
 Function implementations are completed.
 All testcases completed and passed.
-100% line coverage
 
 
 ## Code References
 - No Code References.
 
 ## Generative AI Use
-
-
+## AI Use
+- I used ChatGPT for informational questions only.  
+- I asked questions such as:  
+  - How to initialize a `std::unordered_set` from a `std::vector` in C++  
+  - How to implement a min heap in C++  
+  - How to store a user-defined struct in a `std::priority_queue`  
+  - Whether storing a struct object or a `shared_ptr` to that struct in a priority queue is faster when constantly pushing and popping  
+  - How to split a string by consecutive blocks of spaces whose number may vary in C++  
+  - How to represent infinity for a `double` in C++  
+- No AI-generated code, functions, or implementations were used in my project.  
 
 ### Prompt 1
 in C++ how to initialize a unordered set from a vector
@@ -372,3 +383,111 @@ std::priority_queue<std::shared_ptr<Large>> pq2;
 If you want, I can give a tiny benchmark showing push/pop speed difference between struct vs shared_ptr<struct> for a PQ — it’s surprisingly dramatic for small structs.
 
 Do you want me to do that?
+
+### Prompt 6
+how to split s a string by consecutive block of spaces whose number may vary in C++
+
+### Response 6
+In C++, if you want to split a string by any consecutive block of spaces (where the number of spaces may vary), the most robust way is to use std::regex or std::istringstream with some manual handling. I’ll show a few methods.
+
+⸻
+
+Method 1: Using std::regex
+
+This works well when you want to treat any sequence of spaces as a delimiter.
+
+#include <iostream>
+#include <string>
+#include <vector>
+#include <regex>
+
+int main() {
+    std::string s = "This   is  a   test   string";
+    
+    std::regex re("\\s+"); // one or more whitespace characters
+    std::sregex_token_iterator first{s.begin(), s.end(), re, -1}, last;
+    std::vector<std::string> tokens{first, last};
+    
+    for (const auto& token : tokens) {
+        std::cout << "[" << token << "]\n";
+    }
+}
+
+Output:
+
+[This]
+[is]
+[a]
+[test]
+[string]
+
+✅ Explanation: \\s+ matches one or more whitespace characters, and the -1 flag tells the iterator to return the parts between matches.
+
+⸻
+
+Method 2: Using std::istringstream (simpler for spaces)
+
+std::istringstream treats any whitespace as a delimiter automatically, but it only splits on any single or multiple whitespace together:
+
+#include <iostream>
+#include <sstream>
+#include <string>
+
+int main() {
+    std::string s = "This   is  a   test   string";
+    std::istringstream iss(s);
+    std::string word;
+    
+    while (iss >> word) {
+        std::cout << "[" << word << "]\n";
+    }
+}
+
+Output:
+
+[This]
+[is]
+[a]
+[test]
+[string]
+
+✅ Explanation: The extraction operator (>>) automatically skips any number of consecutive whitespaces, so you don’t need regex.
+
+⸻
+
+Method 3: Manual split with find_first_not_of
+
+If you want full control without regex or streams:
+
+#include <iostream>
+#include <string>
+#include <vector>
+
+int main() {
+    std::string s = "This   is  a   test   string";
+    std::vector<std::string> tokens;
+    size_t start = 0, end;
+    
+    while ((start = s.find_first_not_of(' ', start)) != std::string::npos) {
+        end = s.find(' ', start);
+        tokens.push_back(s.substr(start, end - start));
+        start = end;
+    }
+    
+    for (const auto& t : tokens)
+        std::cout << "[" << t << "]\n";
+}
+
+✅ This gives the same output and works even if the number of spaces varies.
+
+⸻
+
+💡 Recommendation:
+	•	Use std::istringstream if you only need to split by spaces (simplest).
+	•	Use std::regex if you might have other whitespace characters (tabs, etc.) or more complex patterns.
+
+⸻
+
+If you want, I can also show a one-liner modern C++17/20 version using ranges that’s very elegant for this.
+
+Do you want me to show that version too?

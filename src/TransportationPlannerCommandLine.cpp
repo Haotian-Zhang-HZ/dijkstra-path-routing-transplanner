@@ -2,6 +2,8 @@
 #include "StringUtils.h"
 #include "GeographicUtils.h"
 #include <limits.h>
+#include <sstream>
+#include <cmath>
 
 const double NoPathExists = std::numeric_limits<double>::max();
 
@@ -19,6 +21,9 @@ struct CTransportationPlannerCommandLine::SImplementation{
     // These 2 variable is sed to store the info of the curr path
     double PathTime = -1;     
     double PathDistance = -1; 
+    // Record the stored path's srcID and DestID
+    CStreetMap::TNodeID PathSrcID = 0;
+    CStreetMap::TNodeID PathDestID = 0;
 
 
     const std::string LINE1 = "------------------------------------------------------------------------\n";
@@ -71,7 +76,15 @@ struct CTransportationPlannerCommandLine::SImplementation{
                 if(CMD.empty()){
                     continue;
                 }
-                std::vector< std::string > CMDS = StringUtils::Split(CMD," ");
+                // The split function I wrote doesn't support split on multiple spaces 
+                // std::vector< std::string > CMDS = StringUtils::Split(CMD," ");
+                std::vector< std::string > CMDS;
+                // This will treat multiple spaces as one and could split on that 
+                std::istringstream iss(CMD);
+                std::string Element;
+                while (iss >> Element) {
+                    CMDS.push_back(Element);
+                }
                 // output help info
                 if(CMDS[0] == "help"){
                     OutSink->Write(std::vector<char>(LINE1.begin(),LINE1.end()));
@@ -131,7 +144,9 @@ struct CTransportationPlannerCommandLine::SImplementation{
                     try{
                         CStreetMap::TNodeID SrcID = std::stoull(CMDS[1]);
                         CStreetMap::TNodeID DestID = std::stoull(CMDS[2]);
-                        
+                        PathSrcID = SrcID;
+                        PathDestID = DestID;
+
                         double TimeInHours = Planner->FindFastestPath(SrcID,DestID,Path);
     
                         if(TimeInHours != NoPathExists){
@@ -166,7 +181,7 @@ struct CTransportationPlannerCommandLine::SImplementation{
                             if(Seconds > 0) {
                                 ResultStr += std::to_string(Seconds) + " sec";
                             }
-                            ResultStr += "\n";
+                            ResultStr += ".\n";
                             OutSink->Write(std::vector<char>(ResultStr.begin(),ResultStr.end()));
                         }
                         else{
@@ -195,6 +210,9 @@ struct CTransportationPlannerCommandLine::SImplementation{
                     try{
                         CStreetMap::TNodeID SrcID = std::stoull(CMDS[1]);
                         CStreetMap::TNodeID DestID = std::stoull(CMDS[2]);
+                        PathSrcID = SrcID;
+                        PathDestID = DestID;
+
                         std::vector<CStreetMap::TNodeID> path;
                         double Distance = Planner->FindShortestPath(SrcID,DestID,path);
 
@@ -205,7 +223,8 @@ struct CTransportationPlannerCommandLine::SImplementation{
                             Fastest = false;
                             PathTime = -1;
                             PathDistance = Distance;
-                            std::string ResultStr = "Shortest path is " + std::to_string(Distance) + " mi.\n";
+                            std::string DistanceStr = std::format("{:.1f}",Distance);// Only keep 1 digit
+                            std::string ResultStr = "Shortest path is " + DistanceStr + " mi.\n";
                             OutSink->Write(std::vector<char>(ResultStr.begin(),ResultStr.end()));
                             // update Path assume all walk
                             for(auto NodeID : path){
@@ -234,14 +253,12 @@ struct CTransportationPlannerCommandLine::SImplementation{
                     }
                     else{
                         std::string FileName;
-                        auto SrcID = Path.front().second;
-                        auto DestID = Path.back().second;
                         if(Shortest){
-                            FileName = std::to_string(SrcID) + '_' + std::to_string(DestID) + '_' + std::to_string(PathDistance) + "mi.csv";
+                            FileName = std::to_string(PathSrcID) + '_' + std::to_string(PathDestID) + '_' + std::to_string(PathDistance) + "mi.csv";
                         }
 
                         if(Fastest){
-                            FileName = std::to_string(SrcID) + '_' + std::to_string(DestID) + '_' + std::to_string(PathTime) + "hr.csv";
+                            FileName = std::to_string(PathSrcID) + '_' + std::to_string(PathDestID) + '_' + std::to_string(PathTime) + "hr.csv";
                         }
                         // Create a new file sink
                         auto FileSink = Results->CreateSink(FileName);
@@ -249,10 +266,10 @@ struct CTransportationPlannerCommandLine::SImplementation{
                         // Header
                         std::string Header =  "mode,node_id\n";
                         FileSink->Write(std::vector<char>(Header.begin(),Header.end()));
-                        for(auto Step : Path){
+                        for(size_t i = 0; i < Path.size(); i++){
                             std::string Mode;
-                            CStreetMap::TNodeID NodeID = Step.second; 
-                            auto TransMode = Step.first;
+                            CStreetMap::TNodeID NodeID = Path[i].second; 
+                            auto TransMode = Path[i].first;
                             if(TransMode == CTransportationPlanner::ETransportationMode::Walk){
                                 Mode = "Walk";
                             }
@@ -262,7 +279,12 @@ struct CTransportationPlannerCommandLine::SImplementation{
                             if(TransMode == CTransportationPlanner::ETransportationMode::Bus){
                                 Mode = "Bus";
                             }
-                            std::string Row = Mode + ',' + std::to_string(NodeID) + '\n';
+
+                            std::string Row = Mode + ',' + std::to_string(NodeID);
+                            // Add '\n' only if not last line
+                            if(i != Path.size() - 1){
+                                Row += '\n';
+                            }
                             FileSink->Write(std::vector<char>(Row.begin(),Row.end()));
                         }
                         // Output to outputsink

@@ -25,7 +25,7 @@ LDFLAGS			= `pkg-config --libs $(PKGS)`
 
 TEST_CFLAGS		= $(CFLAGS) -Wno-psabi -O0 -g --coverage
 TEST_CPPFLAGS	= $(CPPFLAGS) -fno-inline
-TEST_LDFLAGS	= $(LDFLAGS) -lgtest -lgtest_main -lpthread
+TEST_LDFLAGS	= $(LDFLAGS) -lgtest -lgtest_main -lgmock -lpthread
 
 # Define the test object files
 TEST_STR_OBJ_FILES	= $(TESTOBJ_DIR)/StringUtilsTest.o $(TESTOBJ_DIR)/StringUtils.o
@@ -39,6 +39,13 @@ TEST_CSVBS_OBJ_FILES = $(TESTOBJ_DIR)/StringDataSource.o $(TESTOBJ_DIR)/DSVReade
 TEST_CSVBSINDEX_OBJ_FILES = $(TESTOBJ_DIR)/StringDataSource.o $(TESTOBJ_DIR)/DSVReader.o $(TESTOBJ_DIR)/CSVBusSystem.o $(TESTOBJ_DIR)/BusSystemIndexer.o  $(TESTOBJ_DIR)/CSVBusSystemIndexerTest.o
 TEST_OSM_OBJ_FILES = $(TESTOBJ_DIR)/StringDataSource.o $(TESTOBJ_DIR)/XMLReader.o $(TESTOBJ_DIR)/OpenStreetMap.o $(TESTOBJ_DIR)/OpenStreetMapTest.o
 TEST_DPR_OBJ_FILES = $(TESTOBJ_DIR)/DijkstraPathRouter.o $(TESTOBJ_DIR)/DijkstraPathRouterTest.o 
+TEST_TPCL_OBJ_FILES = \
+    $(TESTOBJ_DIR)/TransportationPlannerCommandLine.o \
+    $(TESTOBJ_DIR)/TPCommandLineTest.o \
+    $(TESTOBJ_DIR)/StringUtils.o \
+    $(TESTOBJ_DIR)/GeographicUtils.o \
+    $(TESTOBJ_DIR)/StringDataSink.o \
+    $(TESTOBJ_DIR)/StringDataSource.o
 TEST_CSVOSMTP_OBJ_FILES = \
 	$(TESTOBJ_DIR)/StringDataSource.o \
 	$(TESTOBJ_DIR)/DSVReader.o \
@@ -66,7 +73,22 @@ SPEEDTEST_OBJ_FILES = \
 	$(TESTOBJ_DIR)/FileDataSink.o \
 	$(TESTOBJ_DIR)/StandardDataSource.o \
 	$(TESTOBJ_DIR)/StandardDataSink.o  \
-	$(TESTOBJ_DIR)/StandardErrorDataSink.o \
+	$(TESTOBJ_DIR)/StandardErrorDataSink.o 
+TRANSP_OBJ_FILES = \
+    $(OBJ_DIR)/TransportationPlannerCommandLine.o \
+    $(OBJ_DIR)/DijkstraTransportationPlanner.o \
+    $(OBJ_DIR)/OpenStreetMap.o \
+    $(OBJ_DIR)/CSVBusSystem.o \
+    $(OBJ_DIR)/BusSystemIndexer.o \
+    $(OBJ_DIR)/GeographicUtils.o \
+    $(OBJ_DIR)/DSVReader.o \
+    $(OBJ_DIR)/XMLReader.o \
+    $(OBJ_DIR)/FileDataFactory.o \
+    $(OBJ_DIR)/FileDataSource.o \
+    $(OBJ_DIR)/FileDataSink.o \
+    $(OBJ_DIR)/StringUtils.o \
+    $(OBJ_DIR)/StringDataSink.o \
+    $(OBJ_DIR)/StringDataSource.o
 
 # Define the test target
 TEST_STR_TARGET	= $(TESTBIN_DIR)/teststrutils
@@ -81,8 +103,9 @@ TEST_CSVBSINDEX_TARGET = $(TESTBIN_DIR)/testcsvbsi
 TEST_OSM_TARGET	= $(TESTBIN_DIR)/testosm
 TEST_DPR_TARGET = $(TESTBIN_DIR)/testdpr
 TEST_CSVOSMTP_TARGET = $(TESTBIN_DIR)/testtp
-SPEEDTEST_TARGET      = $(BIN_DIR)/speedtest
-
+TEST_TPCL_TARGET = $(TESTBIN_DIR)/testtpcl
+SPEEDTEST_TARGET = $(BIN_DIR)/speedtest
+TRANSP_TARGET = $(BIN_DIR)/transplanner
 all: directories \
 		run_strtest \
 		run_strsrctest \
@@ -96,6 +119,8 @@ all: directories \
 		run_csvbstest \
 		run_dprtest		\
 		run_dtptest \
+		run_tpcltest \
+		run_speedtest \
 		gencoverage
 
 run_strtest: $(TEST_STR_TARGET)
@@ -146,8 +171,15 @@ run_dtptest: $(TEST_CSVOSMTP_TARGET)
 	$(TEST_CSVOSMTP_TARGET) --gtest_filter=-CSVOSMTransporationPlanner.PathDescription --gtest_output=xml:$(TESTTMP_DIR)/$@
 	mv $(TESTTMP_DIR)/$@ $@
 
+run_tpcltest: $(TEST_TPCL_TARGET)
+	$(TEST_TPCL_TARGET) --gtest_output=xml:$(TESTTMP_DIR)/$@
+	mv $(TESTTMP_DIR)/$@ $@
+
 run_speedtest: $(SPEEDTEST_TARGET)
 	$(SPEEDTEST_TARGET) --data=./data --results=./results --verbose
+
+run_transpl: $(TRANSP_TARGET)
+	$(TRANSP_TARGET) --data=./data --results=./results --verbose
 
 gencoverage:
 	lcov --capture --directory . --output-file $(TESTCOVER_DIR)/coverage.info --ignore-errors inconsistent,source,count 2>/dev/null 
@@ -192,15 +224,25 @@ $(TEST_DPR_TARGET): $(TEST_DPR_OBJ_FILES)
 	
 $(TEST_CSVOSMTP_TARGET): $(TEST_CSVOSMTP_OBJ_FILES)
 	$(CXX) $(TEST_CFLAGS) $(TEST_CPPFLAGS) $(TEST_CSVOSMTP_OBJ_FILES) $(TEST_LDFLAGS) -o $(TEST_CSVOSMTP_TARGET)
-	
+
+$(TEST_TPCL_TARGET): $(TEST_TPCL_OBJ_FILES)
+	$(CXX) $(TEST_CFLAGS) $(TEST_CPPFLAGS) $(TEST_TPCL_OBJ_FILES) $(TEST_LDFLAGS) -o $(TEST_TPCL_TARGET)
+
 $(SPEEDTEST_TARGET): $(SPEEDTEST_OBJ_FILES)
 	$(CXX) $(TEST_CFLAGS) $(TEST_CPPFLAGS) $(SPEEDTEST_OBJ_FILES) $(TEST_LDFLAGS) -o $@
-$(TESTOBJ_DIR)/%.o: $(TESTSRC_DIR)/%.cpp
 
+$(TRANSP_TARGET): $(TRANSP_OBJ_FILES)
+	$(CXX) $(CFLAGS) $(CPPFLAGS) $(TRANSP_OBJ_FILES) $(LDFLAGS) -o $(TRANSP_TARGET)
+
+$(TESTOBJ_DIR)/%.o: $(TESTSRC_DIR)/%.cpp
 	$(CXX) $(TEST_CFLAGS) $(TEST_CPPFLAGS) $(DEFINES) $(INCLUDE) -c $< -o $@
 
 $(TESTOBJ_DIR)/%.o: $(SRC_DIR)/%.cpp
 	$(CXX) $(TEST_CFLAGS) $(TEST_CPPFLAGS) $(DEFINES) $(INCLUDE) -c $< -o $@
+
+# For TRANSP_OBJ_FILES
+$(OBJ_DIR)/%.o: $(SRC_DIR)/%.cpp
+	$(CXX) $(CFLAGS) $(CPPFLAGS) $(DEFINES) $(INCLUDE) -c $< -o $@
 
 .PHONY: directories
 directories:
@@ -220,7 +262,7 @@ clean::
 	rm -rf $(TESTOBJ_DIR)
 	rm -rf $(TESTCOVER_DIR)
 	rm -rf $(TESTTMP_DIR)
-	rm -f run_strtest run_strsrctest run_strsinktest run_dsvtest run_xmltest run_csvbstest run_osmtest run_filesstest run_geoutilstest run_csvbsindextest run_dprtest run_dtptest 
+	rm -f run_strtest run_strsrctest run_strsinktest run_dsvtest run_xmltest run_csvbstest run_osmtest run_filesstest run_geoutilstest run_csvbsindextest run_dprtest run_dtptest run_tpcltest
 	rm -rf ./results
 
 .PHONY: clean
