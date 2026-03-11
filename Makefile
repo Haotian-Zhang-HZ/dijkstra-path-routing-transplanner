@@ -77,10 +77,10 @@ TEST_GEOUTILS_TARGET = $(TESTBIN_DIR)/testgeoutils
 TEST_DSV_TARGET = $(TESTBIN_DIR)/testdsv
 TEST_XML_TARGET = $(TESTBIN_DIR)/testxml
 TEST_CSVBS_TARGET = $(TESTBIN_DIR)/testcsvbs
-TEST_CSVBSINDEX_TARGET = $(TESTBIN_DIR)/testcsvbsindexer
+TEST_CSVBSINDEX_TARGET = $(TESTBIN_DIR)/testcsvbsi
 TEST_OSM_TARGET	= $(TESTBIN_DIR)/testosm
-TEST_DPR_TARGET = $(TESTBIN_DIR)/testdijkstrapathrouter
-TEST_CSVOSMTP_TARGET = $(TESTBIN_DIR)/testcsvosmtransportationplanner
+TEST_DPR_TARGET = $(TESTBIN_DIR)/testdpr
+TEST_CSVOSMTP_TARGET = $(TESTBIN_DIR)/testtp
 SPEEDTEST_TARGET      = $(BIN_DIR)/speedtest
 
 all: directories \
@@ -220,18 +220,9 @@ clean::
 	rm -rf $(TESTOBJ_DIR)
 	rm -rf $(TESTCOVER_DIR)
 	rm -rf $(TESTTMP_DIR)
-	rm -f run_strtest run_strsrctest run_strsinktest run_dsvtest run_xmltest run_csvbstest run_osmtest run_filesstest run_geoutilstest run_csvbsindextest run_dprtest run_dtptest
+	rm -f run_strtest run_strsrctest run_strsinktest run_dsvtest run_xmltest run_csvbstest run_osmtest run_filesstest run_geoutilstest run_csvbsindextest run_dprtest run_dtptest 
+	rm -rf ./results
 
 .PHONY: clean
 
 
-# SPEEDTEST_TARGET = $(BIN_DIR)/speedtest
-
-# # $(TESTOBJ_DIR)/%.o: $(SRC_DIR)/%.cpp
-# # 	$(CXX) $(CFLAGS) $(CPPFLAGS) -I$(INC_DIR) -c $< -o $@
-
-# $(SPEEDTEST_TARGET): $(SPEEDTEST_OBJ_FILES)
-# 	$(CXX) $(SPEEDTEST_OBJ_FILES) -o $(SPEEDTEST_TARGET) $(LDFLAGS)
-
-# run_speedtest: $(SPEEDTEST_TARGET)
-# 	$(SPEEDTEST_TARGET) --data=./data --results=./results --verbose 

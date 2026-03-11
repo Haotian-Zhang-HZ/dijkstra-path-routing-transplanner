@@ -2,6 +2,8 @@
 
 Student 1: Haotian Zhang (923663223)
 
+I am working alone on this project because my ex-partner has been completely unreachable and never attends class. I have tried to find another classmate to work with, but everyone who regularly attends lectures already has a partner. As a result, I have been unable to find a reliable partner for this project.
+
 ## Project Status
 
 

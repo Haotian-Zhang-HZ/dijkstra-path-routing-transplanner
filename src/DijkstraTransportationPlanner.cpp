@@ -337,6 +337,9 @@ struct CDijkstraTransportationPlanner::SImplementation{
         */
         
         // Optimized version- store struct obj instead of ptr
+        // if we store ptr, everytime we push/pop from PQ, we need to allocate new memory on heap, though smart ptr will magage to 
+        // free the memory, itstill takes a lot more time than simpolty store a struct obj
+        // Especially if we need to run dijkstra many mnay trimes, the time to alocate new memory and 
         // To store user-defined struct in priority Q, we need ca ustom comparator struct
         struct ComparePlannerVertex{
             bool operator()(const PlannerVertex& a,const PlannerVertex& b) const{
