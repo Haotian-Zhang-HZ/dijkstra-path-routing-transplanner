@@ -3,6 +3,7 @@
 #include "GeographicUtils.h"
 #include <limits.h>
 #include <sstream>
+#include <iomanip>
 #include <cmath>
 
 const double NoPathExists = std::numeric_limits<double>::max();
