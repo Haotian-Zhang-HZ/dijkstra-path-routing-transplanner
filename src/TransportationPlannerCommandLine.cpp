@@ -215,7 +215,10 @@ struct CTransportationPlannerCommandLine::SImplementation{
                             Fastest = false;
                             PathTime = -1;
                             PathDistance = Distance;
-                            std::string DistanceStr = std::format("{:.1f}",Distance);// Only keep 1 digit
+                            //std::string DistanceStr = std::format("{:.1f}",Distance);// Only keep 1 digit CSIF doesn't support this
+                            std::ostringstream oss;
+                            oss << std::fixed << std::setprecision(1) << Distance;
+                            std::string DistanceStr = oss.str();
                             std::string ResultStr = "Shortest path is " + DistanceStr + " mi.\n";
                             OutSink->Write(std::vector<char>(ResultStr.begin(),ResultStr.end()));
                             // update Path assume all walk
